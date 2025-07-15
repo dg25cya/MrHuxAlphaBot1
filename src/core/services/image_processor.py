@@ -53,3 +53,6 @@ class ImageProcessor:
 
     def some_method(self) -> None:
         pass
+
+# Restore singleton for import compatibility
+image_processor = ImageProcessor()
