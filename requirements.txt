@@ -41,6 +41,7 @@ uvicorn==0.34.3
 PyJWT==2.8.0
 psutil>=5.9.0
 base58>=2.1.0
+Pillow>=10.0.0
 
 # Machine Learning
 scikit-learn>=1.0.0
