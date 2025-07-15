@@ -1130,29 +1130,8 @@ async def setup_command_handlers(client: TelegramClient, db=None):
 
     @client.on(events.CallbackQuery(data="add_dashboard_output"))
     async def add_dashboard_output_callback(event):
-        """Handle add dashboard output button."""
-        keyboard = [
-            [Button.inline("✅ Dashboard Added!", "menu_outputs")],
-            [Button.inline("🔙 Back to Outputs", "output_add")]
-        ]
-        
-        new_text = (
-            f"🌐 **DASHBOARD OUTPUT ADDED** 🌐\n\n"
-            f"✅ **Dashboard is automatically enabled!**\n\n"
-            f"🌐 **Access your dashboard:**\n"
-            f"• **URL:** http://localhost:8000\n"
-            f"• **Features:** Real-time monitoring\n"
-            f"• **Updates:** Live statistics\n\n"
-            f"⚡ **Dashboard Features:**\n"
-            f"• Real-time alerts\n"
-            f"• Source management\n"
-            f"• Statistics and graphs\n"
-            f"• Settings configuration\n\n"
-            f"*Your web dashboard is ready!* ��"
-        )
-        message = await event.get_message()
-        if message.text != new_text:
-            await safe_edit_event_message(event, new_text, buttons=keyboard)
+        text = "🌐 **Dashboard Output Added!**\n\nYour dashboard is always enabled.\n\nAccess it here: https://mr-hux-alpha-bot.onrender.com\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Outputs", "output_add")]])
 
     # View sources and outputs
     @client.on(events.CallbackQuery(data="source_list"))
@@ -1278,106 +1257,527 @@ async def setup_command_handlers(client: TelegramClient, db=None):
     # Source Filters
     @client.on(events.CallbackQuery(data="source_filters"))
     async def source_filters_callback(event):
-        await placeholder_handler(event, "🔍 Source Filters", "menu_sources", "🔙 Back to Sources")
+        user_id = event.sender_id
+        with db_session() as db:
+            sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == True).all()
+            if not sources:
+                await safe_edit_event_message(event, "❌ No sources found. Add a source first.", buttons=[[Button.inline("🔙 Back to Sources", "menu_sources")]])
+                return
+            if len(sources) == 1:
+                source = sources[0]
+                user_states[user_id] = {"action": "manage_filters", "source_id": source.id}
+                await show_filters_menu(event, source)
+                return
+            # Multiple sources: let user pick
+            keyboard = [[Button.inline(f"{s.name or s.identifier}", f"filter_src_{s.id}")] for s in sources]
+            keyboard.append([Button.inline("🔙 Back to Sources", "menu_sources")])
+            await safe_edit_event_message(event, "🔍 **Select a source to manage filters:**", buttons=keyboard)
+
+    @client.on(events.CallbackQuery(pattern=r"filter_src_\d+"))
+    async def filter_source_select_callback(event):
+        user_id = event.sender_id
+        source_id = int(event.data.decode().split("_")[-1])
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", "source_filters")]])
+                return
+            user_states[user_id] = {"action": "manage_filters", "source_id": source.id}
+            await show_filters_menu(event, source)
+
+    async def show_filters_menu(event, source):
+        filters = source.custom_filters or {}
+        filter_list = filters.get("keywords", [])
+        text = f"🔍 **Filters for {source.name or source.identifier}:**\n\n"
+        if filter_list:
+            text += "\n".join([f"• `{f}`" for f in filter_list]) + "\n\n"
+        else:
+            text += "_No filters set._\n\n"
+        keyboard = []
+        if filter_list:
+            for idx, f in enumerate(filter_list):
+                keyboard.append([Button.inline(f"❌ Remove: {f}", f"remove_filter_{source.id}_{idx}")])
+        keyboard.append([Button.inline("➕ Add Filter", f"add_filter_{source.id}")])
+        keyboard.append([Button.inline("🔙 Back to Sources", "menu_sources")])
+        await safe_edit_event_message(event, text, buttons=keyboard)
+
+    @client.on(events.CallbackQuery(pattern=r"add_filter_\d+"))
+    async def add_filter_callback(event):
+        user_id = event.sender_id
+        source_id = int(event.data.decode().split("_")[-1])
+        user_states[user_id] = {"action": "awaiting_filter_input", "source_id": source_id}
+        await safe_edit_event_message(event, "✏️ **Send the keyword or regex to add as a filter:**\n\n_Example: presale, moon, pump, ^SOL_", buttons=[[Button.inline("🔙 Cancel", f"filter_src_{source_id}")]])
+
+    @client.on(events.NewMessage(pattern=r'^(?!/).+'))
+    async def handle_filter_input(event: Message):
+        user_id = event.sender_id
+        state = user_states.get(user_id)
+        if not state or state.get("action") != "awaiting_filter_input":
+            return
+        filter_text = (event.text or "").strip()
+        source_id = state["source_id"]
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await event.reply("❌ Source not found.")
+                return
+            filters = source.custom_filters or {}
+            filter_list = filters.get("keywords", [])
+            if filter_text in filter_list:
+                await event.reply("⚠️ This filter already exists.")
+                return
+            filter_list.append(filter_text)
+            filters["keywords"] = filter_list
+            source.custom_filters = filters
+            db.commit()
+        del user_states[user_id]
+        await show_filters_menu(event, source)
+
+    @client.on(events.CallbackQuery(pattern=r"remove_filter_\d+_\d+"))
+    async def remove_filter_callback(event):
+        user_id = event.sender_id
+        parts = event.data.decode().split("_")
+        source_id = int(parts[2])
+        idx = int(parts[3])
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", "source_filters")]])
+                return
+            filters = source.custom_filters or {}
+            filter_list = filters.get("keywords", [])
+            if idx < 0 or idx >= len(filter_list):
+                await safe_edit_event_message(event, "❌ Invalid filter index.", buttons=[[Button.inline("🔙 Back", f"filter_src_{source_id}")]])
+                return
+            removed = filter_list.pop(idx)
+            filters["keywords"] = filter_list
+            source.custom_filters = filters
+            db.commit()
+        await show_filters_menu(event, source)
 
     # Source Schedule
     @client.on(events.CallbackQuery(data="source_schedule"))
     async def source_schedule_callback(event):
-        await placeholder_handler(event, "⏰ Source Schedule", "menu_sources", "🔙 Back to Sources")
+        user_id = event.sender_id
+        with db_session() as db:
+            sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == True).all()
+            if not sources:
+                await safe_edit_event_message(event, "❌ No sources found. Add a source first.", buttons=[[Button.inline("🔙 Back to Sources", "menu_sources")]])
+                return
+            if len(sources) == 1:
+                source = sources[0]
+                user_states[user_id] = {"action": "manage_schedule", "source_id": source.id}
+                await show_schedule_menu(event, source)
+                return
+            # Multiple sources: let user pick
+            keyboard = [[Button.inline(f"{s.name or s.identifier}", f"schedule_src_{s.id}")] for s in sources]
+            keyboard.append([Button.inline("🔙 Back to Sources", "menu_sources")])
+            await safe_edit_event_message(event, "⏰ **Select a source to manage scan schedule:**", buttons=keyboard)
+
+    @client.on(events.CallbackQuery(pattern=r"schedule_src_\d+"))
+    async def schedule_source_select_callback(event):
+        user_id = event.sender_id
+        source_id = int(event.data.decode().split("_")[-1])
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", "source_schedule")]])
+                return
+            user_states[user_id] = {"action": "manage_schedule", "source_id": source.id}
+            await show_schedule_menu(event, source)
+
+    async def show_schedule_menu(event, source):
+        interval = source.scan_interval or 60
+        text = f"⏰ **Scan Schedule for {source.name or source.identifier}:**\n\n"
+        text += f"Current scan interval: **{interval} seconds** ({interval//60} min {interval%60} sec)\n\n"
+        text += "You can change how often this source is scanned for new messages.\n\n"
+        keyboard = [
+            [Button.inline("✏️ Change Interval", f"change_schedule_{source.id}")],
+            [Button.inline("🔙 Back to Sources", "menu_sources")]
+        ]
+        await safe_edit_event_message(event, text, buttons=keyboard)
+
+    @client.on(events.CallbackQuery(pattern=r"change_schedule_\d+"))
+    async def change_schedule_callback(event):
+        user_id = event.sender_id
+        source_id = int(event.data.decode().split("_")[-1])
+        user_states[user_id] = {"action": "awaiting_schedule_input", "source_id": source_id}
+        await safe_edit_event_message(event, "⏰ **Send the new scan interval in seconds (10-86400):**", buttons=[[Button.inline("🔙 Cancel", f"schedule_src_{source_id}")]])
+
+    @client.on(events.NewMessage(pattern=r'^(?!/).+'))
+    async def handle_schedule_input(event: Message):
+        user_id = event.sender_id
+        state = user_states.get(user_id)
+        if not state or state.get("action") != "awaiting_schedule_input":
+            return
+        interval_text = (event.text or "").strip()
+        try:
+            interval = int(interval_text)
+            if interval < 10 or interval > 86400:
+                raise ValueError
+        except Exception:
+            await event.reply("❌ Invalid interval. Please enter a number between 10 and 86400.")
+            return
+        source_id = state["source_id"]
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await event.reply("❌ Source not found.")
+                return
+            source.scan_interval = interval
+            db.commit()
+        del user_states[user_id]
+        await show_schedule_menu(event, source)
 
     # AI Menu
     @client.on(events.CallbackQuery(data="ai_toggle"))
     async def ai_toggle_callback(event):
-        await placeholder_handler(event, "🎯 Toggle AI Features", "menu_ai", "🔙 Back to AI Menu")
+        user_id = event.sender_id
+        with db_session() as db:
+            sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == True).all()
+            if not sources:
+                await safe_edit_event_message(event, "❌ No sources found. Add a source first.", buttons=[[Button.inline("🔙 Back to AI Menu", "menu_ai")]])
+                return
+            if len(sources) == 1:
+                source = sources[0]
+                user_states[user_id] = {"action": "manage_ai", "source_id": source.id}
+                await show_ai_menu(event, source)
+                return
+            # Multiple sources: let user pick
+            keyboard = [[Button.inline(f"{s.name or s.identifier}", f"ai_src_{s.id}")] for s in sources]
+            keyboard.append([Button.inline("🔙 Back to AI Menu", "menu_ai")])
+            await safe_edit_event_message(event, "🤖 **Select a source to manage AI features:**", buttons=keyboard)
+
+    @client.on(events.CallbackQuery(pattern=r"ai_src_\d+"))
+    async def ai_source_select_callback(event):
+        user_id = event.sender_id
+        source_id = int(event.data.decode().split("_")[-1])
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", "ai_toggle")]])
+                return
+            user_states[user_id] = {"action": "manage_ai", "source_id": source.id}
+            await show_ai_menu(event, source)
+
+    async def show_ai_menu(event, source):
+        text = f"🤖 **AI Features for {source.name or source.identifier}:**\n\n"
+        text += f"• Sentiment Analysis: {'✅ ON' if source.sentiment_analysis else '❌ OFF'}\n"
+        text += f"• Pattern Learning: {'✅ ON' if source.pattern_learning else '❌ OFF'}\n"
+        text += f"• Smart Filtering: {'✅ ON' if source.smart_filtering else '❌ OFF'}\n\n"
+        text += "Toggle features below.\n\n"
+        keyboard = [
+            [Button.inline(f"{'✅' if source.sentiment_analysis else '❌'} Sentiment Analysis", f"toggle_ai_{source.id}_sentiment")],
+            [Button.inline(f"{'✅' if source.pattern_learning else '❌'} Pattern Learning", f"toggle_ai_{source.id}_pattern")],
+            [Button.inline(f"{'✅' if source.smart_filtering else '❌'} Smart Filtering", f"toggle_ai_{source.id}_smart")],
+            [Button.inline("🔙 Back to AI Menu", "menu_ai")]
+        ]
+        await safe_edit_event_message(event, text, buttons=keyboard)
+
+    @client.on(events.CallbackQuery(pattern=r"toggle_ai_\d+_(sentiment|pattern|smart)"))
+    async def toggle_ai_feature_callback(event):
+        user_id = event.sender_id
+        parts = event.data.decode().split("_")
+        source_id = int(parts[2])
+        feature = parts[3]
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", f"ai_src_{source_id}")]])
+                return
+            if feature == "sentiment":
+                source.sentiment_analysis = not source.sentiment_analysis
+            elif feature == "pattern":
+                source.pattern_learning = not source.pattern_learning
+            elif feature == "smart":
+                source.smart_filtering = not source.smart_filtering
+            db.commit()
+        await show_ai_menu(event, source)
 
     @client.on(events.CallbackQuery(data="ai_settings"))
     async def ai_settings_callback(event):
-        await placeholder_handler(event, "📋 AI Settings", "menu_ai", "🔙 Back to AI Menu")
+        await safe_edit_event_message(event, "📋 **AI Settings:**\n\nAI features can be toggled per source. Use the 'Toggle Features' menu to enable or disable Sentiment Analysis, Pattern Learning, and Smart Filtering for each source.\n\nFor advanced configuration, contact support.", buttons=[[Button.inline("🔙 Back to AI Menu", "menu_ai")]])
 
     @client.on(events.CallbackQuery(data="ai_stats"))
     async def ai_stats_callback(event):
-        await placeholder_handler(event, "📊 AI Stats", "menu_ai", "🔙 Back to AI Menu")
+        # Show AI stats (use text_analyzer if available)
+        stats = None
+        try:
+            stats = text_analyzer.get_stats()
+        except Exception:
+            stats = None
+        text = "📊 **AI Stats:**\n\n"
+        if stats:
+            for k, v in stats.items():
+                text += f"• {k}: {v}\n"
+        else:
+            text += "No stats available.\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to AI Menu", "menu_ai")]])
 
     @client.on(events.CallbackQuery(data="ai_help"))
     async def ai_help_callback(event):
-        await placeholder_handler(event, "❓ AI Help", "menu_ai", "🔙 Back to AI Menu")
+        text = "❓ **AI Help:**\n\n"
+        text += "• **Sentiment Analysis:** Uses AI to detect positive/negative/neutral sentiment in messages.\n"
+        text += "• **Pattern Learning:** Learns from message patterns to improve detection.\n"
+        text += "• **Smart Filtering:** Uses AI to filter spam and irrelevant messages.\n\n"
+        text += "Toggle these features in the AI menu for each source.\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to AI Menu", "menu_ai")]])
 
     # Settings
     @client.on(events.CallbackQuery(data="settings_general"))
     async def settings_general_callback(event):
-        await placeholder_handler(event, "⚙️ General Settings", "menu_settings", "🔙 Back to Settings")
+        user_id = event.sender_id
+        with db_session() as db:
+            sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == True).all()
+            if not sources:
+                await safe_edit_event_message(event, "❌ No sources found. Add a source first.", buttons=[[Button.inline("🔙 Back to Settings", "menu_settings")]])
+                return
+            if len(sources) == 1:
+                source = sources[0]
+                user_states[user_id] = {"action": "manage_settings", "source_id": source.id}
+                await show_settings_menu(event, source)
+                return
+            keyboard = [[Button.inline(f"{s.name or s.identifier}", f"settings_src_{s.id}")] for s in sources]
+            keyboard.append([Button.inline("🔙 Back to Settings", "menu_settings")])
+            await safe_edit_event_message(event, "⚙️ **Select a source to manage settings:**", buttons=keyboard)
 
-    @client.on(events.CallbackQuery(data="settings_notify"))
-    async def settings_notify_callback(event):
-        await placeholder_handler(event, "🔔 Notification Settings", "menu_settings", "🔙 Back to Settings")
+    @client.on(events.CallbackQuery(pattern=r"settings_src_\d+"))
+    async def settings_source_select_callback(event):
+        user_id = event.sender_id
+        source_id = int(event.data.decode().split("_")[-1])
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", "settings_general")]])
+                return
+            user_states[user_id] = {"action": "manage_settings", "source_id": source.id}
+            await show_settings_menu(event, source)
 
-    @client.on(events.CallbackQuery(data="settings_perf"))
-    async def settings_perf_callback(event):
-        await placeholder_handler(event, "🚀 Performance Settings", "menu_settings", "🔙 Back to Settings")
+    async def show_settings_menu(event, source):
+        text = f"⚙️ **Settings for {source.name or source.identifier}:**\n\n"
+        text += f"• Notifications: {'✅ ON' if source.notification_channels else '❌ OFF'}\n"
+        text += f"• Rate Limit: {source.rate_limit or 'Unlimited'} alerts/hour\n"
+        text += f"• Privacy: {'🔒 Strict' if source.meta_data and source.meta_data.get('privacy') == 'strict' else '🔓 Standard'}\n\n"
+        keyboard = [
+            [Button.inline("🔔 Toggle Notifications", f"toggle_notify_{source.id}")],
+            [Button.inline("🚀 Set Rate Limit", f"set_rate_{source.id}")],
+            [Button.inline("🔒 Toggle Privacy", f"toggle_privacy_{source.id}")],
+            [Button.inline("🗄️ Data", f"settings_data_{source.id}")],
+            [Button.inline("🧹 Cleanup", f"settings_cleanup_{source.id}")],
+            [Button.inline("🔙 Back to Settings", "menu_settings")]
+        ]
+        await safe_edit_event_message(event, text, buttons=keyboard)
 
-    @client.on(events.CallbackQuery(data="settings_privacy"))
-    async def settings_privacy_callback(event):
-        await placeholder_handler(event, "🔒 Privacy Settings", "menu_settings", "🔙 Back to Settings")
+    @client.on(events.CallbackQuery(pattern=r"toggle_notify_\d+"))
+    async def toggle_notify_callback(event):
+        source_id = int(event.data.decode().split("_")[-1])
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", f"settings_src_{source_id}")]])
+                return
+            if source.notification_channels:
+                source.notification_channels = []
+            else:
+                source.notification_channels = [1]  # Dummy channel for ON (replace with real logic)
+            db.commit()
+        await show_settings_menu(event, source)
 
-    @client.on(events.CallbackQuery(data="settings_data"))
+    @client.on(events.CallbackQuery(pattern=r"set_rate_\d+"))
+    async def set_rate_callback(event):
+        user_id = event.sender_id
+        source_id = int(event.data.decode().split("_")[-1])
+        user_states[user_id] = {"action": "awaiting_rate_input", "source_id": source_id}
+        await safe_edit_event_message(event, "🚀 **Send the new rate limit (alerts per hour, 1-1000, or 0 for unlimited):**", buttons=[[Button.inline("🔙 Cancel", f"settings_src_{source_id}")]])
+
+    @client.on(events.NewMessage(pattern=r'^(?!/).+'))
+    async def handle_rate_input(event: Message):
+        user_id = event.sender_id
+        state = user_states.get(user_id)
+        if not state or state.get("action") != "awaiting_rate_input":
+            return
+        rate_text = (event.text or "").strip()
+        try:
+            rate = int(rate_text)
+            if rate < 0 or rate > 1000:
+                raise ValueError
+        except Exception:
+            await event.reply("❌ Invalid rate. Please enter a number between 0 and 1000.")
+            return
+        source_id = state["source_id"]
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await event.reply("❌ Source not found.")
+                return
+            source.rate_limit = rate if rate > 0 else None
+            db.commit()
+        del user_states[user_id]
+        await show_settings_menu(event, source)
+
+    @client.on(events.CallbackQuery(pattern=r"toggle_privacy_\d+"))
+    async def toggle_privacy_callback(event):
+        source_id = int(event.data.decode().split("_")[-1])
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", f"settings_src_{source_id}")]])
+                return
+            meta = source.meta_data or {}
+            if meta.get('privacy') == 'strict':
+                meta['privacy'] = 'standard'
+            else:
+                meta['privacy'] = 'strict'
+            source.meta_data = meta
+            db.commit()
+        await show_settings_menu(event, source)
+
+    @client.on(events.CallbackQuery(pattern=r"settings_data_\d+"))
     async def settings_data_callback(event):
-        await placeholder_handler(event, "🗄️ Data Management", "menu_settings", "🔙 Back to Settings")
+        source_id = int(event.data.decode().split("_")[-1])
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", f"settings_src_{source_id}")]])
+                return
+            text = f"🗄️ **Data for {source.name or source.identifier}:**\n\n"
+            text += f"• Alerts sent: {getattr(source, 'alert_count', 0)}\n"
+            text += f"• Mentions: {getattr(source, 'mention_count', 0)}\n"
+            text += f"• Errors: {source.error_count}\n"
+            await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back", f"settings_src_{source_id}")]])
 
-    @client.on(events.CallbackQuery(data="settings_cleanup"))
+    @client.on(events.CallbackQuery(pattern=r"settings_cleanup_\d+"))
     async def settings_cleanup_callback(event):
-        await placeholder_handler(event, "🧹 Cleanup Settings", "menu_settings", "🔙 Back to Settings")
+        source_id = int(event.data.decode().split("_")[-1])
+        with db_session() as db:
+            source = db.query(MonitoredSource).get(source_id)
+            if not source:
+                await safe_edit_event_message(event, "❌ Source not found.", buttons=[[Button.inline("🔙 Back", f"settings_src_{source_id}")]])
+                return
+            source.error_count = 0
+            source.last_scanned_at = None
+            db.commit()
+            await safe_edit_event_message(event, f"🧹 **Cleanup complete for {source.name or source.identifier}.**", buttons=[[Button.inline("🔙 Back", f"settings_src_{source_id}")]])
 
     # Stats
     @client.on(events.CallbackQuery(data="stats_detail"))
     async def stats_detail_callback(event):
-        await placeholder_handler(event, "📊 Detailed Stats", "menu_stats", "🔙 Back to Stats")
+        stats = await get_stats()
+        text = "📊 **Bot Statistics:**\n\n"
+        text += f"• Active Sources: {stats.get('active_sources', 0)}\n"
+        text += f"• Recent Updates: {stats.get('recent_updates', 0)}\n"
+        text += f"• Error Rate: {stats.get('error_rate', 0):.2f}%\n"
+        text += f"• Telegram Channels: {stats.get('telegram_channels', 0)}\n"
+        text += f"• Discord Webhooks: {stats.get('discord_webhooks', 0)}\n"
+        text += f"• Total Messages: {stats.get('total_messages', 0)}\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Stats", "menu_stats")]])
 
     @client.on(events.CallbackQuery(data="stats_graphs"))
     async def stats_graphs_callback(event):
-        await placeholder_handler(event, "📈 Stats Graphs", "menu_stats", "🔙 Back to Stats")
+        # Simple text-based bar graph for active sources and errors
+        stats = await get_stats()
+        active = stats.get('active_sources', 0)
+        errors = int(stats.get('error_rate', 0))
+        bar = '█' * min(active, 20)
+        err_bar = '█' * min(errors, 20)
+        text = f"📈 **Stats Graphs:**\n\nActive Sources: {bar} ({active})\nErrors: {err_bar} ({errors})\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Stats", "menu_stats")]])
 
     @client.on(events.CallbackQuery(data="stats_history"))
     async def stats_history_callback(event):
-        await placeholder_handler(event, "📜 Stats History", "menu_stats", "🔙 Back to Stats")
+        # Show last 10 events from logs (if available)
+        try:
+            with open('logs/bot.log', 'r') as f:
+                lines = f.readlines()[-10:]
+        except Exception:
+            lines = ["No history available."]
+        text = "📜 **Recent Bot Events:**\n\n" + "".join(lines)
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Stats", "menu_stats")]])
 
     @client.on(events.CallbackQuery(data="stats_errors"))
     async def stats_errors_callback(event):
-        await placeholder_handler(event, "❌ Stats Errors", "menu_stats", "🔙 Back to Stats")
+        # Show last 10 errors from logs (if available)
+        try:
+            with open('logs/bot.log', 'r') as f:
+                errors = [l for l in f if 'ERROR' in l][-10:]
+        except Exception:
+            errors = ["No error logs available."]
+        text = "❌ **Recent Errors:**\n\n" + "".join(errors)
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Stats", "menu_stats")]])
 
     @client.on(events.CallbackQuery(data="stats_refresh"))
     async def stats_refresh_callback(event):
-        await placeholder_handler(event, "🔄 Refresh Stats", "menu_stats", "🔙 Back to Stats")
+        # Just re-call the stats_detail handler
+        await stats_detail_callback(event)
 
     @client.on(events.CallbackQuery(data="stats_dash"))
     async def stats_dash_callback(event):
-        await placeholder_handler(event, "🌐 Dashboard Stats", "menu_stats", "🔙 Back to Stats")
+        text = "🌐 **Dashboard:**\n\nAccess the live dashboard at:\nhttps://mr-hux-alpha-bot.onrender.com\n\nFeatures:\n• Real-time monitoring\n• Source management\n• Statistics and graphs\n• Settings configuration\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Stats", "menu_stats")]])
 
     # Help
     @client.on(events.CallbackQuery(data="help_guide"))
     async def help_guide_callback(event):
-        await placeholder_handler(event, "📖 User Guide", "menu_help", "🔙 Back to Help")
+        text = "📖 **User Guide:**\n\nWelcome to MR HUX Alpha Bot!\n\n- Use the main menu to access all features.\n- Add sources to monitor Telegram, Discord, Reddit, X/Twitter, and more.\n- Set up filters, schedules, and alerts.\n- Configure output channels for notifications.\n- Use the dashboard for advanced analytics.\n\nFor a full guide, visit: https://mr-hux-alpha-bot.onrender.com/docs\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Help", "menu_help")]])
 
     @client.on(events.CallbackQuery(data="help_faq"))
     async def help_faq_callback(event):
-        await placeholder_handler(event, "❓ FAQ", "menu_help", "🔙 Back to Help")
+        text = "❓ **FAQ:**\n\nQ: How do I add a new source?\nA: Use the 'HUNT SOURCES' button and follow the prompts.\n\nQ: How do I get alerts?\nA: Add an output channel in 'ALERT CHANNELS'.\n\nQ: How do I use filters?\nA: Go to 'Filters' in the source menu to add keywords or regex.\n\nQ: Where is the dashboard?\nA: https://mr-hux-alpha-bot.onrender.com\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Help", "menu_help")]])
 
     @client.on(events.CallbackQuery(data="help_tutorial"))
     async def help_tutorial_callback(event):
-        await placeholder_handler(event, "🎓 Tutorial", "menu_help", "🔙 Back to Help")
+        text = "🎓 **Tutorial:**\n\n1. Click /start to open the main menu.\n2. Add a source to monitor.\n3. Set up filters and schedules.\n4. Add an output channel.\n5. Watch for alerts and check the dashboard.\n\nFor a video tutorial, visit: https://mr-hux-alpha-bot.onrender.com/tutorial\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Help", "menu_help")]])
 
     @client.on(events.CallbackQuery(data="help_trouble"))
     async def help_trouble_callback(event):
-        await placeholder_handler(event, "🔧 Troubleshooting", "menu_help", "🔙 Back to Help")
+        text = "🔧 **Troubleshooting:**\n\n- Not receiving alerts? Check your output channels and filters.\n- Errors in dashboard? Try refreshing or contact support.\n- Still stuck? Use the Support button below.\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Help", "menu_help")]])
 
     @client.on(events.CallbackQuery(data="help_support"))
     async def help_support_callback(event):
-        await placeholder_handler(event, "💬 Support", "menu_help", "🔙 Back to Help")
+        text = "💬 **Support:**\n\nFor help, join our Telegram community:\nhttps://t.me/MrHuxCommunity\n\nOr email: support@mrhuxbot.com\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Help", "menu_help")]])
 
     @client.on(events.CallbackQuery(data="help_updates"))
     async def help_updates_callback(event):
-        await placeholder_handler(event, "📰 Updates", "menu_help", "🔙 Back to Help")
+        try:
+            with open('CHANGELOG.md', 'r') as f:
+                changelog = ''.join(f.readlines()[-10:])
+        except Exception:
+            changelog = "No recent updates found."
+        text = f"📰 **Latest Updates:**\n\n{changelog}\n"
+        await safe_edit_event_message(event, text, buttons=[[Button.inline("🔙 Back to Help", "menu_help")]])
 
     # Output management - Email output
     @client.on(events.CallbackQuery(data="add_email_output"))
     async def add_email_output_callback(event):
-        await placeholder_handler(event, "📧 Add Email Output", "output_add", "�� Back to Outputs")
+        user_id = event.sender_id
+        user_states[user_id] = {"action": "awaiting_email_output"}
+        await safe_edit_event_message(event, "📧 **Send the email address to receive alerts:**", buttons=[[Button.inline("🔙 Cancel", "output_add")]])
+
+    @client.on(events.NewMessage(pattern=r'^(?!/).+'))
+    async def handle_email_output_input(event: Message):
+        user_id = event.sender_id
+        state = user_states.get(user_id)
+        if not state or state.get("action") != "awaiting_email_output":
+            return
+        email = (event.text or "").strip()
+        import re
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            await event.reply("❌ Invalid email address. Please try again.")
+            return
+        from src.models.monitored_source import OutputChannel, OutputType
+        from src.utils.db import db_session
+        with db_session() as db:
+            exists = db.query(OutputChannel).filter(OutputChannel.identifier == email, OutputChannel.type == OutputType.WEBHOOK).first()
+            if exists:
+                await event.reply("⚠️ This email is already registered as an output.")
+            else:
+                output = OutputChannel(type=OutputType.WEBHOOK, identifier=email, name=email, is_active=True)
+                db.add(output)
+                db.commit()
+                await event.reply(f"✅ Email output added: {email}")
+        del user_states[user_id]

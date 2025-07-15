@@ -1,7 +1,8 @@
 """Telegram message listener and handler."""
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 from functools import wraps
 import asyncio
+import re
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -26,12 +27,16 @@ from src.config.settings import get_settings
 from src.core.services.text_analysis import deepseek_analyze
 from src.models.output_channel import OutputChannel, OutputType
 from src.core.services.output_service import OutputService
+from src.core.services.token_monitor import TokenMonitor
 
 settings = get_settings()
 
 # Batch processing settings
 BATCH_SIZE = 10
 BATCH_TIMEOUT = 5  # seconds
+
+# Singleton for real-time token monitoring
+TOKEN_MONITOR = TokenMonitor()
 
 class MessageBatch:
     """Batch message processor for improved performance."""
@@ -78,9 +83,9 @@ class MessageBatch:
 # Global batch processor
 message_batch = MessageBatch()
 
-def with_db_retry(max_retries: int = 3, delay: float = 0.1) -> None:
+def with_db_retry(max_retries: int = 3, delay: float = 0.1) -> Callable:
     """Decorator to retry database operations."""
-    def decorator(func) -> None:
+    def decorator(func) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
             last_error = None
@@ -169,6 +174,12 @@ async def process_token(
             sentiment = 'neutral'
             summary = 'AI analysis unavailable'
         
+        # After storing the mention, trigger real-time analysis
+        try:
+            await TOKEN_MONITOR.add_token(token_address, db=db)
+        except Exception as e:
+            logger.error(f"TokenMonitor analysis failed: {e}")
+        
         # Send alert to output channels
         await send_token_alert(token, message_text, group, sentiment, summary, db)
         
@@ -238,38 +249,56 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
     if not hasattr(event, 'message') or not isinstance(event.message, Message):
         log_message_processed("invalid_message")
         return
-        
     msg = event.message
     if not msg.text:
         log_message_processed("no_text")
         return
-        
     # Ignore bot commands
     if msg.text.startswith('/'):
         log_message_processed("bot_command")
         return
-        
     try:
         with time_message_processing():
             # Extract necessary fields and verify they are not None
             if not msg.text or not msg.chat_id or not msg.id:
                 log_message_processed("missing_fields")
                 return
-                
+            # --- FILTER LOGIC ---
+            from src.models.monitored_source import MonitoredSource
+            from src.utils.db import db_session
+            with db_session() as db:
+                source = db.query(MonitoredSource).filter(MonitoredSource.identifier == str(msg.chat_id), MonitoredSource.is_active == True).first()
+                if source and source.custom_filters:
+                    filters = source.custom_filters.get("keywords", [])
+                    if filters:
+                        matched = False
+                        for f in filters:
+                            if f:
+                                if any(c in f for c in "^$.*+?[]{}|()"):
+                                    try:
+                                        if re.search(f, msg.text, re.IGNORECASE):
+                                            matched = True
+                                            break
+                                    except re.error:
+                                        continue
+                                elif f.lower() in msg.text.lower():
+                                    matched = True
+                                    break
+                        if not matched:
+                            log_message_processed("filtered_out")
+                            return
+            # --- END FILTER LOGIC ---
             # Use an instance of TokenParser
             parser = TokenParser()
-            
             # Extract tokens from message text and images (async)
             tokens = await parser.parse_message(
                 msg.text, 
                 msg.chat_id, 
                 msg.id
             )
-            
             if not tokens:
                 log_message_processed("no_tokens")
                 return
-                
             # Use provided session or get a new one from generator
             db = session
             if db is None:
@@ -280,7 +309,6 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
                     log_db_error("create_session")
                     log_message_processed("db_session_error")
                     return
-            
             try:
                 for token_match in tokens:
                     result = await process_token(
@@ -302,7 +330,6 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
                     except Exception as e:
                         logger.error(f"Error closing database session: {e}")
                         log_db_error("close_session")
-                        
     except Exception as e:
         logger.exception(f"Error processing message: {e}")
         log_message_processed("processing_error")
