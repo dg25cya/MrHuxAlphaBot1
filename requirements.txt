@@ -1,5 +1,4 @@
-base58>=2.1.0
-Pillow>=10.0.0
+uvicorn>=0.20.0
 
 # Machine Learning
 scikit-learn>=1.0.0
