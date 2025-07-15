@@ -3,6 +3,9 @@ from typing import Dict, Optional, Tuple
 from textblob import TextBlob
 from loguru import logger
 from src.utils.text import clean_text, extract_entities
+import httpx
+from src.config.settings import get_settings
+settings = get_settings()
 
 class TextAnalysisService:
     """Service for text analysis using free NLP tools."""
@@ -139,3 +142,31 @@ class TextAnalysisService:
             "accuracy": 92,  # Overall accuracy percentage
             "error_rate": 5  # Error rate percentage
         }
+
+async def deepseek_analyze(text):
+    api_key = settings.deepseek_api_key
+    if not api_key:
+        raise ValueError("DeepSeek API key not set.")
+    url = "https://api.deepseek.com/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": "You are an expert crypto analyst. Summarize and analyze the following message for sentiment (positive/neutral/negative) and provide a short summary."},
+            {"role": "user", "content": text}
+        ]
+    }
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, json=payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+        # Simple parsing: look for 'Sentiment:' and 'Summary:'
+        sentiment = None
+        summary = None
+        for line in content.splitlines():
+            if "sentiment" in line.lower():
+                sentiment = line.split(":",1)[-1].strip()
+            if "summary" in line.lower():
+                summary = line.split(":",1)[-1].strip()
+        return {"sentiment": sentiment, "summary": summary, "raw": content}

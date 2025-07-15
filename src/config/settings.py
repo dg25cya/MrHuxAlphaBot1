@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     rugcheck_api_key: Optional[str] = None
     birdeye_api_key: Optional[str] = None
     dexscreener_api_key: Optional[str] = None
+    deepseek_api_key: Optional[str] = None
     
     # Social Media API Keys
     reddit_client_id: Optional[str] = None

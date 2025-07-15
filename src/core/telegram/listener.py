@@ -23,6 +23,9 @@ from src.utils.db import db_session
 from src.utils import get_utc_now
 from src.database import SessionLocal
 from src.config.settings import get_settings
+from src.core.services.text_analysis import deepseek_analyze
+from src.models.output_channel import OutputChannel, OutputType
+from src.core.services.output_service import OutputService
 
 settings = get_settings()
 
@@ -105,7 +108,7 @@ async def process_token(
     db: Session
 ) -> Optional[Token]:
     """
-    Process a found token, create or update records.
+    Process a found token, create or update records, and send alerts.
     
     Args:
         token_address: The Solana token address
@@ -156,19 +159,79 @@ async def process_token(
         db.add(mention)
         db.commit()  # Commit all changes
         
+        # Analyze with DeepSeek AI
+        try:
+            ai_analysis = await deepseek_analyze(message_text)
+            sentiment = ai_analysis.get('sentiment', 'neutral')
+            summary = ai_analysis.get('summary', 'No summary available')
+        except Exception as e:
+            logger.warning(f"DeepSeek analysis failed: {e}")
+            sentiment = 'neutral'
+            summary = 'AI analysis unavailable'
+        
+        # Send alert to output channels
+        await send_token_alert(token, message_text, group, sentiment, summary, db)
+        
         log_message_processed("success")
         return token
-        
     except Exception as e:
-        logger.error(f"Failed to process token: {e}")
-        log_message_processed("error")
-        if isinstance(e, SQLAlchemyError):
-            log_db_error("process_token")
-        try:
-            db.rollback()
-        except Exception as e:
-            pass
+        logger.error(f"Error processing token: {e}")
         return None
+
+async def send_token_alert(token: Token, message_text: str, group: MonitoredGroup, sentiment: str, summary: str, db: Session):
+    """Send token alert to all output channels."""
+    try:
+        # Get all active output channels
+        output_channels = db.query(OutputChannel).filter(OutputChannel.is_active == True).all()
+        
+        if not output_channels:
+            logger.warning("No active output channels found")
+            return
+        
+        # Format alert message
+        alert_message = f"""
+🚨 **NEW TOKEN DETECTED** 🚨
+
+🪙 **Token:** `{token.address}`
+📱 **Source:** {group.name or group.group_id}
+💬 **Message:** {message_text[:200]}{'...' if len(message_text) > 200 else ''}
+
+🤖 **AI Analysis:**
+• **Sentiment:** {sentiment}
+• **Summary:** {summary}
+
+⏰ **Detected:** {get_utc_now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+🔗 **View on Solscan:** https://solscan.io/token/{token.address}
+"""
+        
+        # Send to each output channel
+        for channel in output_channels:
+            try:
+                if channel.type == OutputType.TELEGRAM:
+                    # Send to Telegram channel
+                    from src.core.telegram.client import client
+                    if client and client.is_connected():
+                        await client.send_message(
+                            entity=channel.identifier,
+                            message=alert_message,
+                            parse_mode='markdown'
+                        )
+                        logger.info(f"Alert sent to Telegram channel {channel.identifier}")
+                elif channel.type == OutputType.DISCORD:
+                    # Send to Discord webhook
+                    import aiohttp
+                    async with aiohttp.ClientSession() as session:
+                        await session.post(
+                            channel.identifier,
+                            json={"content": alert_message}
+                        )
+                        logger.info(f"Alert sent to Discord webhook {channel.identifier}")
+            except Exception as e:
+                logger.error(f"Failed to send alert to channel {channel.identifier}: {e}")
+                
+    except Exception as e:
+        logger.error(f"Error sending token alert: {e}")
 
 async def handle_new_message(event: NewMessage.Event, session: Optional[Session] = None):
     """Handle new messages in monitored groups."""
