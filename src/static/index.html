@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr Hux Alpha Bot - Dashboard</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <div class="dashboard">
+        <header style="display: flex; align-items: center;">
+            <img src="/static/logo.png" alt="Mr Hux Alpha Bot Logo" class="logo" />
+            <h1 style="margin-left: 16px;">Mr Hux Alpha Bot</h1>
+            <nav>
+                <button class="nav-btn active" data-section="monitoring">📡 Monitoring</button>
+                <button class="nav-btn" data-section="tokens">🪙 Tokens</button>
+                <button class="nav-btn" data-section="alerts">🚨 Alerts</button>
+                <button class="nav-btn" data-section="settings">⚙️ Settings</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Monitoring Section -->
+            <section id="monitoring" class="section active">
+                <div class="section-header">
+                    <h2>Source Monitoring</h2>
+                    <button id="addSourceBtn" class="btn primary">+ Add Source</button>
+                </div>
+
+                <!-- Source List -->
+                <div class="source-grid">
+                    <div class="source-type">
+                        <h3>📱 Telegram Groups</h3>
+                        <div id="telegramSources" class="source-list"></div>
+                    </div>
+                    <div class="source-type">
+                        <h3>💬 Discord Servers</h3>
+                        <div id="discordSources" class="source-list"></div>
+                    </div>
+                    <div class="source-type">
+                        <h3>🐦 X Profiles</h3>
+                        <div id="xSources" class="source-list"></div>
+                    </div>
+                </div>
+
+                <!-- Monitoring Stats -->
+                <div class="stats-panel">
+                    <h3>📊 Monitoring Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-label">Active Sources</span>
+                            <span id="activeSourcesCount" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Messages Today</span>
+                            <span id="messagesToday" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Token Mentions</span>
+                            <span id="tokenMentions" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Alerts Today</span>
+                            <span id="alertsToday" class="stat-value">0</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tokens Section -->
+            <section id="tokens" class="section">
+                <div class="section-header">
+                    <h2>🪙 Token Analytics</h2>
+                </div>
+                <div class="tokens-content">
+                    <p>Token analytics and trending tokens will appear here.</p>
+                    <div id="tokensList"></div>
+                </div>
+            </section>
+
+            <!-- Alerts Section -->
+            <section id="alerts" class="section">
+                <div class="section-header">
+                    <h2>🚨 Alerts</h2>
+                </div>
+                <div class="alerts-content">
+                    <p>Recent alerts and notifications will appear here.</p>
+                    <div id="alertsList"></div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings" class="section">
+                <div class="section-header">
+                    <h2>⚙️ Settings</h2>
+                </div>
+                <div class="settings-content">
+                    <p>Bot and dashboard settings will appear here.</p>
+                    <div id="settingsPanel"></div>
+                </div>
+            </section>
+
+            <!-- Add Source Modal -->
+            <div id="addSourceModal" class="modal">
+                <div class="modal-content">
+                    <h2>Add New Source</h2>
+                    <div class="source-type-select">
+                        <button class="source-type-btn" data-type="telegram">
+                            <span>📱</span>
+                            Telegram Group
+                        </button>
+                        <button class="source-type-btn" data-type="discord">
+                            <span>💬</span>
+                            Discord Server
+                        </button>
+                        <button class="source-type-btn" data-type="x">
+                            <span>🐦</span>
+                            X Profile
+                        </button>
+                    </div>
+                    <form id="addSourceForm">
+                        <div class="form-group telegram-input">
+                            <label>Group ID:</label>
+                            <input type="text" name="telegramId" placeholder="-100123456789">
+                        </div>
+                        <div class="form-group discord-input hidden">
+                            <label>Server ID:</label>
+                            <input type="text" name="discordId" placeholder="123456789">
+                        </div>
+                        <div class="form-group x-input hidden">
+                            <label>X Handle:</label>
+                            <input type="text" name="xHandle" placeholder="@username">
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn secondary" onclick="closeModal()">Cancel</button>
+                            <button type="submit" class="btn primary">Add Source</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

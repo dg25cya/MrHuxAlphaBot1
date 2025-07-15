@@ -1,0 +1,3 @@
+2025-07-11 14:05:43.702 | ERROR    | __main__:run:311 - Bot error: 
+2025-07-11 14:05:43.703 | INFO     | __main__:cleanup:262 - Cleaning up...
+2025-07-11 14:05:43.704 | ERROR    | __main__:main:328 - Fatal error: 'function' object has no attribute 'registry'

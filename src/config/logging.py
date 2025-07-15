@@ -19,14 +19,14 @@ config = {
         {
             "sink": sys.stdout,
             "format": "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-            "level": settings.LOG_LEVEL,
+            "level": settings.log_level,
         },
         {
             "sink": "logs/sma_telebot.log",
             "format": "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
             "rotation": "1 day",
             "retention": "1 month",
-            "level": settings.LOG_LEVEL,
+            "level": settings.log_level,
         },
     ],
 }
@@ -40,7 +40,7 @@ for handler in config["handlers"]:
 
 # Intercept standard library logging
 class InterceptHandler(logging.Handler):
-    def emit(self, record):
+    def emit(self, record) -> None:
         try:
             level = logger.level(record.levelname).name
         except ValueError:
@@ -51,13 +51,20 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
-        )
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
-# Configure standard library logging
-logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+# Set up logging for other modules
+logging.basicConfig(handlers=[InterceptHandler()], level=0)
 
-# Configure external libraries logging
-for log_name in ["telethon", "httpx", "sqlalchemy", "alembic"]:
-    logging.getLogger(log_name).setLevel(settings.LOG_LEVEL)
+# Configure logging for common modules
+COMMON_MODULES = [
+    "sqlalchemy",
+    "alembic",
+    "telethon",
+    "aiohttp",
+    "asyncio",
+]
+
+for log_name in COMMON_MODULES:
+    logging.getLogger(log_name).setLevel(settings.log_level)
+    logging.getLogger(log_name).handlers = []

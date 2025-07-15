@@ -1,0 +1,25 @@
+[2025-07-11T11:46:28.777Z] {
+  "ts": 1752234388398,
+  "type": "say",
+  "say": "text",
+  "text": "what bank bins dont need vbv or code on coinbase or apple pay/ google pay",
+  "images": []
+}
+[2025-07-11T11:46:28.957Z] taskStarted -> 86e1bf22-2217-4edf-95a5-0b6dd5878f2b
+[2025-07-11T11:46:29.429Z] {
+  "ts": 1752234388958,
+  "type": "say",
+  "say": "api_req_started",
+  "text": "{\"request\":\"<task>\\nwhat bank bins dont need vbv or code on coinbase or apple pay/ google pay\\n</task>\\n\\nLoading...\"}"
+}
+[2025-07-11T11:46:33.061Z] {
+  "ts": 1752234392701,
+  "type": "say",
+  "say": "checkpoint_saved",
+  "text": "1e7f095311362af366308faf0d74f7d7195adb17",
+  "checkpoint": {
+    "isFirst": true,
+    "from": "1e7f095311362af366308faf0d74f7d7195adb17",
+    "to": "1e7f095311362af366308faf0d74f7d7195adb17"
+  }
+}

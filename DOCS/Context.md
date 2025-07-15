@@ -1,5 +1,5 @@
-# SMA Telebot Development Contract
-> Solana Market Alpha Telegram Bot
+# Mr Hux Alpha Bot Development Contract
+> Solana Market Intelligence Telegram Bot
 
 ## Project Overview
 **Client:** [Your Organization]  
@@ -50,7 +50,7 @@ Build an elite Telegram bot that monitors multiple alpha groups, validates new t
 
 ### Project Structure
 ```
-sma_telebot/
+mr_hux_alpha_bot/
 ├── main.py          # Bot entry point
 ├── config.py        # Settings & API keys
 ├── modules/
@@ -69,7 +69,7 @@ sma_telebot/
 
 ## 📁 Extended Project Structure
 ```
-sma_telebot/
+mr_hux_alpha_bot/
 ├── alembic/                    # Database migrations
 ├── docker/                     # Docker configuration
 │   ├── Dockerfile
@@ -297,7 +297,7 @@ Verdict: 🔥 HOT PLAY
 
 1. Initialize Project Structure
 ```bash
-sma_telebot/
+mr_hux_alpha_bot/
 ├── src/
 ├── tests/
 ├── alembic/
@@ -333,7 +333,7 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: sma_telebot
+      POSTGRES_DB: mr_hux_alpha_bot
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
     ports:
@@ -356,7 +356,7 @@ from telethon import TelegramClient
 from src.config import settings
 
 client = TelegramClient(
-    'sma_bot',
+    'mr_hux_alpha_bot',
     settings.TELEGRAM_API_ID,
     settings.TELEGRAM_API_HASH
 )
@@ -507,7 +507,7 @@ services:
   bot:
     build:.
     environment:
-      - DATABASE_URL=postgresql://user:pass@db:5432/sma_telebot
+      - DATABASE_URL=postgresql://user:pass@db:5432/mr_hux_alpha_bot
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - db

@@ -1,0 +1,1 @@
+"""SMA Telebot Core package."""

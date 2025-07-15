@@ -1,1 +1,1 @@
-"""Configuration module for SMA Telebot."""
+"""Configuration module for Mr Hux Alpha Bot."""
