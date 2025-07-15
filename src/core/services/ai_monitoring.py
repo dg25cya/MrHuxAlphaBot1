@@ -7,8 +7,8 @@ from loguru import logger
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import IsolationForest
 from textblob import TextBlob
-import torch
-from transformers import pipeline
+# import torch  # DISABLED for free hosting
+# from transformers import pipeline  # DISABLED for free hosting
 
 from src.config.settings import get_settings
 from src.models.monitored_source import MonitoredSource, TokenTrendType
@@ -70,7 +70,7 @@ class AICache:
 
 
 class AIMonitoringService:
-    """AI-powered monitoring service for enhanced token detection and analysis."""
+    """AI-powered monitoring service for enhanced token detection and analysis. (DISABLED for free hosting)"""
 
     def __init__(self, output_service: OutputService) -> None:
         """Initialize AI monitoring service."""
@@ -92,16 +92,17 @@ class AIMonitoringService:
         self.max_cache_size = settings.max_cache_size
         
         # Initialize sentiment model
-        self.sentiment_model = None
-        if torch.cuda.is_available():
-            try:
-                self.sentiment_model = pipeline(
-                    task="sentiment-analysis",
-                    model="finiteautomata/bertweet-base-sentiment-analysis",
-                    device=0
-                )
-            except Exception as e:
-                logger.warning(f"Failed to load GPU sentiment model: {e}")
+        # self.sentiment_model = None  # DISABLED
+        # if torch.cuda.is_available():
+        #     try:
+        #         self.sentiment_model = pipeline(
+        #             task="sentiment-analysis",
+        #             model="finiteautomata/bertweet-base-sentiment-analysis",
+        #             device=0
+        #         )
+        #     except Exception as e:
+        #         logger.warning(f"Failed to load GPU sentiment model: {e}")
+        logger.warning("Advanced AI/ML (torch/transformers) is disabled for free hosting. Only TextBlob is available.")
                 
     async def analyze_message(
         self, 
@@ -192,18 +193,11 @@ class AIMonitoringService:
             return 0.5  # Neutral score on error
 
     async def _analyze_sentiment(self, message: str) -> float:
-        """Analyze message sentiment."""
+        """Analyze message sentiment (TextBlob only)."""
         try:
-            if self.sentiment_model:
-                # Use transformer model if available
-                result = self.sentiment_model(message)[0]
-                score = result['score'] * (1 if result['label'] == 'positive' else -1)
-            else:
-                # Fallback to TextBlob
-                blob = TextBlob(message)
-                score = float(blob.sentiment.polarity)
+            blob = TextBlob(message)
+            score = float(blob.sentiment.polarity)
             return score
-            
         except Exception as e:
             logger.error(f"Error in sentiment analysis: {e}")
             return 0.0  # Neutral sentiment on error

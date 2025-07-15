@@ -15,28 +15,29 @@ class TextAnalysisService:
         self.initialized = True
         self.summarizer = None
         self.translator = None
-        try:
-            from transformers.pipelines import pipeline
-            # Use smaller, faster models for summarization and translation
-            self.summarizer = pipeline(
-                "summarization",
-                model="sshleifer/distilbart-cnn-12-6",  # smaller, faster
-                max_length=130,
-                min_length=30,
-                truncation=True
-            )
-            self.translator = pipeline(
-                "translation",
-                model="Helsinki-NLP/opus-mt-mul-en",
-                max_length=512
-            )
-            logger.info("NLP models initialized successfully (using small models)")
-        except ImportError as e:
-            logger.warning(f"Transformers not available: {e}")
-            self.initialized = False
-        except Exception as e:
-            logger.warning(f"Failed to initialize some NLP models: {e}")
-            self.initialized = False
+        # DISABLED: transformers-based NLP for free hosting
+        # try:
+        #     from transformers.pipelines import pipeline
+        #     self.summarizer = pipeline(
+        #         "summarization",
+        #         model="sshleifer/distilbart-cnn-12-6",
+        #         max_length=130,
+        #         min_length=30,
+        #         truncation=True
+        #     )
+        #     self.translator = pipeline(
+        #         "translation",
+        #         model="Helsinki-NLP/opus-mt-mul-en",
+        #         max_length=512
+        #     )
+        #     logger.info("NLP models initialized successfully (using small models)")
+        # except ImportError as e:
+        #     logger.warning(f"Transformers not available: {e}")
+        #     self.initialized = False
+        # except Exception as e:
+        #     logger.warning(f"Failed to initialize some NLP models: {e}")
+        #     self.initialized = False
+        logger.warning("Advanced NLP (transformers) is disabled for free hosting. Only TextBlob is available.")
     
     def analyze_text(
         self, 
