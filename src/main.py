@@ -94,7 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard)
     app.include_router(metrics)
     app.include_router(websocket)
-    app.include_router(dashboard_api_router)
+    app.include_router(dashboard_api_router, prefix="/api")
     
     # Mount static files
     try:

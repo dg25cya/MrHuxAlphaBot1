@@ -563,7 +563,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
         
         stats = await get_stats()
         
-        await event.edit(
+        new_text = (
             f"🎯 **SOURCE HUNTING DASHBOARD** 🎯\n\n"
             f"🔍 **Current Status:**\n"
             f"• 📡 Active Sources: {stats.get('active_sources', 0)}\n"
@@ -574,9 +574,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 📋 **View Active Sources** - See what's being tracked\n"
             f"• 🎯 **Smart Filters** - Set up keyword alerts\n"
             f"• ⏰ **Scan Schedules** - Optimize monitoring frequency\n\n"
-            f"*Ready to discover the next big thing?* 🚀",
-            buttons=keyboard
+            f"*Ready to discover the next big thing?* 🚀"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_outputs"))
     async def menu_outputs_callback(event):
@@ -597,7 +598,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
         
         stats = await get_stats()
         
-        await event.edit(
+        new_text = (
             f"📢 **ALERT CHANNEL COMMAND CENTER** 📢\n\n"
             f"🚨 **Current Status:**\n"
             f"• 📱 Telegram Channels: {stats.get('telegram_channels', 0)}\n"
@@ -608,9 +609,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 💬 **Discord Webhooks** - Integrate with Discord servers\n"
             f"• ✨ **Custom Formats** - Style your alerts perfectly\n"
             f"• ⚡ **Smart Notifications** - Get alerts when it matters\n\n"
-            f"*Never miss a signal again!* 🔥",
-            buttons=keyboard
+            f"*Never miss a signal again!* 🔥"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_ai"))
     async def menu_ai_callback(event):
@@ -631,7 +633,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
         
         stats = await get_stats()
         
-        await event.edit(
+        new_text = (
             f"🤖 **AI INTELLIGENCE CENTER** 🤖\n\n"
             f"🧠 **Current Status:**\n"
             f"• 💭 Sentiment: {stats.get('sentiment_status', 'Unknown')}\n"
@@ -643,9 +645,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 📝 **Smart Summarization** - Extract key insights instantly\n"
             f"• 🌍 **Auto-Translation** - Break language barriers\n"
             f"• 🎯 **Context-Aware Filtering** - Only relevant alerts\n\n"
-            f"*Your AI-powered alpha hunting companion!* ⚡",
-            buttons=keyboard
+            f"*Your AI-powered alpha hunting companion!* ⚡"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_settings"))
     async def menu_settings_callback(event):
@@ -668,7 +671,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             ]
         ]
         
-        await event.edit(
+        new_text = (
             f"⚙️ **BOT SETTINGS CENTER** ⚙️\n\n"
             f"🔧 **Configuration Options:**\n"
             f"• ⚙️ **General Settings** - Basic bot configuration\n"
@@ -677,9 +680,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 🔒 **Privacy** - Data handling and security\n"
             f"• 🗄️ **Data Management** - Storage and backup settings\n"
             f"• 🧹 **Cleanup** - Maintenance and cleanup options\n\n"
-            f"*Customize your alpha hunting experience!* 🎯",
-            buttons=keyboard
+            f"*Customize your alpha hunting experience!* 🎯"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_stats"))
     async def menu_stats_callback(event):
@@ -704,7 +708,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
         
         stats = await get_stats()
         
-        await event.edit(
+        new_text = (
             f"📊 **LIVE STATISTICS DASHBOARD** 📊\n\n"
             f"🎯 **Current Performance:**\n"
             f"• 📡 Active Sources: {stats.get('active_sources', 0)}\n"
@@ -717,9 +721,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 📈 **Graphs** - Visual performance data\n"
             f"• 📜 **History** - Historical trends\n"
             f"• ❌ **Errors** - Error tracking and analysis\n\n"
-            f"*Track your alpha hunting performance!* 🚀",
-            buttons=keyboard
+            f"*Track your alpha hunting performance!* 🚀"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_help"))
     async def menu_help_callback(event):
@@ -742,7 +747,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             ]
         ]
         
-        await event.edit(
+        new_text = (
             f"❓ **HELP & SUPPORT CENTER** ❓\n\n"
             f"🎯 **Get the Help You Need:**\n"
             f"• 📖 **User Guide** - Complete usage instructions\n"
@@ -751,9 +756,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 🔧 **Troubleshooting** - Common issues and solutions\n"
             f"• 💬 **Support** - Contact our support team\n"
             f"• 📰 **Updates** - Latest features and improvements\n\n"
-            f"*We're here to help you succeed!* 🤝",
-            buttons=keyboard
+            f"*We're here to help you succeed!* 🤝"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_main"))
     async def menu_main_callback(event):
@@ -777,10 +783,11 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             ]
         ]
         
-        await event.edit(
-            UI["messages"]["welcome"],
-            buttons=keyboard
+        new_text = (
+            UI["messages"]["welcome"]
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     # Source management callbacks
     @client.on(events.CallbackQuery(data="source_add"))
@@ -804,7 +811,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             ]
         ]
         
-        await event.edit(
+        new_text = (
             f"🆕 **ADD NEW ALPHA SOURCE** 🆕\n\n"
             f"🎯 **Choose Your Hunting Ground:**\n"
             f"• 📱 **Telegram** - Groups and channels\n"
@@ -813,9 +820,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 📰 **RSS** - News feeds and blogs\n"
             f"• 🐙 **GitHub** - Repository updates\n"
             f"• 🐦 **X/Twitter** - Social media signals\n\n"
-            f"*Select where you want to discover the next big thing!* 🚀",
-            buttons=keyboard
+            f"*Select where you want to discover the next big thing!* 🚀"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_telegram_source"))
     async def add_telegram_source_callback(event):
@@ -827,7 +835,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             [Button.inline("🔙 Back to Sources", "source_add")]
         ]
         
-        await event.edit(
+        new_text = (
             f"📱 **TELEGRAM ALPHA HUNTING** 📱\n\n"
             f"🎯 **Send the group/channel to monitor:**\n\n"
             f"📝 **Format Examples:**\n"
@@ -839,9 +847,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"🔒 **Privacy:** Your monitoring is completely private\n"
             f"🎯 **Supports:** Both @ usernames and group IDs\n\n"
             f"*Ready to catch that alpha?* 🚀\n\n"
-            f"**Type the @username or group ID below:**",
-            buttons=keyboard
+            f"**Type the @username or group ID below:**"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_discord_source"))
     async def add_discord_source_callback(event):
@@ -853,7 +862,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             [Button.inline("🔙 Back to Sources", "source_add")]
         ]
         
-        await event.edit(
+        new_text = (
             f"💬 **DISCORD ALPHA HUNTING** 💬\n\n"
             f"🎯 **Send the Discord server ID to monitor:**\n\n"
             f"🔧 **How to find Server ID:**\n"
@@ -866,9 +875,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Real-time message tracking\n"
             f"• Smart filtering and alerts\n\n"
             f"*Let's hunt some Discord alpha!* 🔥\n\n"
-            f"**Type the server ID below:**",
-            buttons=keyboard
+            f"**Type the server ID below:**"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_reddit_source"))
     async def add_reddit_source_callback(event):
@@ -880,7 +890,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             [Button.inline("🔙 Back to Sources", "source_add")]
         ]
         
-        await event.edit(
+        new_text = (
             f"🌐 **REDDIT ALPHA HUNTING** 🌐\n\n"
             f"🎯 **Send the subreddit name to monitor:**\n\n"
             f"📝 **Popular Examples:**\n"
@@ -895,9 +905,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Trending topic detection\n"
             f"• Real-time alerts\n\n"
             f"*Reddit alpha is waiting!* 🚀\n\n"
-            f"**Type the subreddit name below:**",
-            buttons=keyboard
+            f"**Type the subreddit name below:**"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_twitter_source"))
     async def add_twitter_source_callback(event):
@@ -909,7 +920,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             [Button.inline("🔙 Back to Sources", "source_add")]
         ]
         
-        await event.edit(
+        new_text = (
             f"🐦 **X/TWITTER ALPHA HUNTING** 🐦\n\n"
             f"🎯 **Send the username to monitor:**\n\n"
             f"📝 **Format Examples:**\n"
@@ -925,9 +936,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Trend detection\n"
             f"• Real-time alerts\n\n"
             f"*Twitter alpha is waiting!* 🚀\n\n"
-            f"**Type the username below:**",
-            buttons=keyboard
+            f"**Type the username below:**"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_rss_source"))
     async def add_rss_source_callback(event):
@@ -939,10 +951,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             [Button.inline("🔙 Back to Sources", "source_add")]
         ]
         
-        await event.edit(
+        new_text = (
             f"📰 **RSS ALPHA HUNTING** 📰\n\n"
             f"🎯 **Send the RSS feed URL to monitor:**\n\n"
-            f"📝 **Popular Examples:**\n"
+            f"�� **Popular Examples:**\n"
             f"• **CoinDesk:** https://www.coindesk.com/arc/outboundfeeds/rss/\n"
             f"• **Cointelegraph:** https://cointelegraph.com/rss\n"
             f"• **Decrypt:** https://decrypt.co/feed\n\n"
@@ -952,9 +964,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Keyword filtering\n"
             f"• Real-time alerts\n\n"
             f"*Stay ahead with RSS alpha!* 📰\n\n"
-            f"**Type the RSS URL below:**",
-            buttons=keyboard
+            f"**Type the RSS URL below:**"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_github_source"))
     async def add_github_source_callback(event):
@@ -966,7 +979,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             [Button.inline("🔙 Back to Sources", "source_add")]
         ]
         
-        await event.edit(
+        new_text = (
             f"🐙 **GITHUB ALPHA HUNTING** 🐙\n\n"
             f"🎯 **Send the repository to monitor:**\n\n"
             f"📝 **Format:** owner/repo\n"
@@ -980,9 +993,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Pull request monitoring\n"
             f"• Real-time alerts\n\n"
             f"*GitHub alpha is waiting!* 🚀\n\n"
-            f"**Type the repository (owner/repo) below:**",
-            buttons=keyboard
+            f"**Type the repository (owner/repo) below:**"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     # Output management callbacks
     @client.on(events.CallbackQuery(data="output_add"))
@@ -1002,7 +1016,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             ]
         ]
         
-        await event.edit(
+        new_text = (
             f"📢 **ADD ALERT CHANNEL** 📢\n\n"
             f"🎯 **Choose Your Alert Destination:**\n"
             f"• 📱 **Telegram Channel** - Send to your groups/channels\n"
@@ -1014,9 +1028,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Rich formatting\n"
             f"• Custom templates\n"
             f"• Delivery confirmation\n\n"
-            f"*Never miss important signals!* 🔥",
-            buttons=keyboard
+            f"*Never miss important signals!* 🔥"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_telegram_channel"))
     async def add_telegram_channel_callback(event):
@@ -1028,7 +1043,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             [Button.inline("🔙 Back to Outputs", "output_add")]
         ]
         
-        await event.edit(
+        new_text = (
             f"📱 **ADD TELEGRAM CHANNEL** 📱\n\n"
             f"🎯 **Send the channel/group to receive alerts:**\n\n"
             f"📝 **Format Examples:**\n"
@@ -1041,9 +1056,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"3. Send the username or ID below\n\n"
             f"🔒 **Privacy:** Only you can see your alerts\n\n"
             f"*Ready to receive alpha alerts!* 🚀\n\n"
-            f"**Type the channel/group below:**",
-            buttons=keyboard
+            f"**Type the channel/group below:**"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_discord_webhook"))
     async def add_discord_webhook_callback(event):
@@ -1055,7 +1071,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             [Button.inline("🔙 Back to Outputs", "output_add")]
         ]
         
-        await event.edit(
+        new_text = (
             f"💬 **ADD DISCORD WEBHOOK** 💬\n\n"
             f"🎯 **Send the Discord webhook URL:**\n\n"
             f"🔧 **How to create a webhook:**\n"
@@ -1071,9 +1087,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Real-time delivery\n"
             f"• Error handling\n\n"
             f"*Ready to send Discord alerts!* 🔥\n\n"
-            f"**Type the webhook URL below:**",
-            buttons=keyboard
+            f"**Type the webhook URL below:**"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_dashboard_output"))
     async def add_dashboard_output_callback(event):
@@ -1083,7 +1100,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             [Button.inline("🔙 Back to Outputs", "output_add")]
         ]
         
-        await event.edit(
+        new_text = (
             f"🌐 **DASHBOARD OUTPUT ADDED** 🌐\n\n"
             f"✅ **Dashboard is automatically enabled!**\n\n"
             f"🌐 **Access your dashboard:**\n"
@@ -1095,9 +1112,10 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Source management\n"
             f"• Statistics and graphs\n"
             f"• Settings configuration\n\n"
-            f"*Your web dashboard is ready!* 🚀",
-            buttons=keyboard
+            f"*Your web dashboard is ready!* 🚀"
         )
+        if event.text != new_text:
+            await event.edit(new_text, buttons=keyboard)
 
     # View sources and outputs
     @client.on(events.CallbackQuery(data="source_list"))
@@ -1121,17 +1139,18 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     [Button.inline("➕ Add First Source", "source_add")],
                     [Button.inline("🔙 Back to Sources", "menu_sources")]
                 ]
-                await event.edit(
-                    f"📋 **ACTIVE SOURCES** 📋\n\n"
+                new_text = (
+                    f"�� **ACTIVE SOURCES** 📋\n\n"
                     f"❌ **No sources found**\n\n"
                     f"🎯 **Get started by adding your first source!**\n"
                     f"• 📱 Telegram groups\n"
                     f"• 💬 Discord servers\n"
                     f"• 🌐 Reddit subreddits\n"
                     f"• 🐦 Twitter accounts\n\n"
-                    f"*Ready to start hunting alpha?* 🚀",
-                    buttons=keyboard
+                    f"*Ready to start hunting alpha?* 🚀"
                 )
+                if event.text != new_text:
+                    await event.edit(new_text, buttons=keyboard)
             else:
                 source_list = "\n".join([
                     f"• {src['type']}: {src['name']}" for src in source_dicts[:10]
@@ -1140,14 +1159,15 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     [Button.inline("➕ Add More", "source_add")],
                     [Button.inline("🔙 Back to Sources", "menu_sources")]
                 ]
-                await event.edit(
+                new_text = (
                     f"📋 **ACTIVE SOURCES** 📋\n\n"
                     f"✅ **Found {len(source_dicts)} active sources:**\n\n"
                     f"{source_list}\n\n"
                     f"{'... and more' if len(source_dicts) > 10 else ''}\n\n"
-                    f"🎯 **All sources are actively monitoring for alpha!**",
-                    buttons=keyboard
+                    f"🎯 **All sources are actively monitoring for alpha!**"
                 )
+                if event.text != new_text:
+                    await event.edit(new_text, buttons=keyboard)
         except Exception as e:
             logger.error(f"Error listing sources: {e}")
             keyboard = [
@@ -1178,12 +1198,13 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     [Button.inline("➕ Add Output", "output_add")],
                     [Button.inline("🔙 Back to Outputs", "menu_outputs")]
                 ]
-                await event.edit(
-                    f"📢 **ACTIVE OUTPUTS** 📢\n\n"
+                new_text = (
+                    f"�� **ACTIVE OUTPUTS** 📢\n\n"
                     f"❌ **No outputs found**\n\n"
-                    f"*Add an output channel to start receiving alerts!* 🚀",
-                    buttons=keyboard
+                    f"*Add an output channel to start receiving alerts!* ��"
                 )
+                if event.text != new_text:
+                    await event.edit(new_text, buttons=keyboard)
             else:
                 output_list = "\n".join([
                     f"• {out['type']}: {out['name']}" for out in output_dicts[:10]
@@ -1192,14 +1213,15 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     [Button.inline("➕ Add More", "output_add")],
                     [Button.inline("🔙 Back to Outputs", "menu_outputs")]
                 ]
-                await event.edit(
+                new_text = (
                     f"📢 **ACTIVE OUTPUTS** 📢\n\n"
                     f"✅ **Found {len(output_dicts)} active outputs:**\n\n"
                     f"{output_list}\n\n"
                     f"{'... and more' if len(output_dicts) > 10 else ''}\n\n"
-                    f"*All outputs are ready to deliver alerts!* 🚀",
-                    buttons=keyboard
+                    f"*All outputs are ready to deliver alerts!* 🚀"
                 )
+                if event.text != new_text:
+                    await event.edit(new_text, buttons=keyboard)
         except Exception as e:
             logger.error(f"Error listing outputs: {e}")
             keyboard = [
