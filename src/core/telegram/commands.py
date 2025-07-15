@@ -7,6 +7,7 @@ from loguru import logger
 import emoji
 import threading
 import time
+from telethon.errors.rpcerrorlist import MessageNotModifiedError
 
 from src.config.settings import get_settings
 from src.models.monitored_source import MonitoredSource, SourceType, OutputChannel, OutputType
@@ -153,6 +154,24 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             logger.error(f"Error getting stats: {e}")
             return {}
 
+    # Place the helper before any callback handlers so it's in scope
+    async def safe_edit_event_message(event, text=None, **kwargs):
+        """
+        Edits the event message only if the content or markup is different.
+        """
+        message = await event.get_message()
+        current_text = message.text or message.message
+        new_text = text or kwargs.get("message") or kwargs.get("text")
+        markup = kwargs.get("buttons") or kwargs.get("reply_markup")
+        current_markup = message.reply_markup
+        # If both text and markup are unchanged, skip edit
+        if current_text == new_text and current_markup == markup:
+            return
+        try:
+            await event.edit(text, **kwargs)
+        except MessageNotModifiedError:
+            pass  # Silently ignore
+
     @client.on(events.NewMessage(pattern=r'/start'))
     async def start_command(event: Message):
         """Handle /start command with enhanced UI."""
@@ -250,7 +269,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                         [Button.inline("🔙 Main Menu", "menu_main")]
                     ]
                     
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"✅ **Telegram Source Added Successfully!**\n\n"
                         f"📱 **Source:** {text}\n"
                         f"🎯 **Status:** Active and monitoring\n"
@@ -260,7 +279,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     
                 except Exception as e:
                     logger.error(f"Error adding Telegram source: {e}")
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"❌ **Error adding source:** {str(e)}\n\n"
                         f"Please try again or contact support.",
                         buttons=[[Button.inline("🔙 Back to Sources", "menu_sources")]]
@@ -289,7 +308,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                         [Button.inline("🔙 Main Menu", "menu_main")]
                     ]
                     
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"✅ **Discord Source Added Successfully!**\n\n"
                         f"💬 **Server ID:** {text}\n"
                         f"🎯 **Status:** Active and monitoring\n"
@@ -299,7 +318,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     
                 except Exception as e:
                     logger.error(f"Error adding Discord source: {e}")
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"❌ **Error adding source:** {str(e)}\n\n"
                         f"Please try again or contact support.",
                         buttons=[[Button.inline("🔙 Back to Sources", "menu_sources")]]
@@ -328,7 +347,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                         [Button.inline("🔙 Main Menu", "menu_main")]
                     ]
                     
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"✅ **Reddit Source Added Successfully!**\n\n"
                         f"🌐 **Subreddit:** r/{text}\n"
                         f"🎯 **Status:** Active and monitoring\n"
@@ -338,7 +357,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     
                 except Exception as e:
                     logger.error(f"Error adding Reddit source: {e}")
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"❌ **Error adding source:** {str(e)}\n\n"
                         f"Please try again or contact support.",
                         buttons=[[Button.inline("🔙 Back to Sources", "menu_sources")]]
@@ -369,7 +388,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                         [Button.inline("🔙 Main Menu", "menu_main")]
                     ]
                     
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"✅ **Twitter Source Added Successfully!**\n\n"
                         f"🐦 **Username:** @{username}\n"
                         f"🎯 **Status:** Active and monitoring\n"
@@ -379,7 +398,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     
                 except Exception as e:
                     logger.error(f"Error adding Twitter source: {e}")
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"❌ **Error adding source:** {str(e)}\n\n"
                         f"Please try again or contact support.",
                         buttons=[[Button.inline("🔙 Back to Sources", "menu_sources")]]
@@ -408,7 +427,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                         [Button.inline("🔙 Main Menu", "menu_main")]
                     ]
                     
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"✅ **RSS Source Added Successfully!**\n\n"
                         f"📰 **Feed:** {text[:100]}...\n"
                         f"🎯 **Status:** Active and monitoring\n"
@@ -418,7 +437,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     
                 except Exception as e:
                     logger.error(f"Error adding RSS source: {e}")
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"❌ **Error adding source:** {str(e)}\n\n"
                         f"Please try again or contact support.",
                         buttons=[[Button.inline("🔙 Back to Sources", "menu_sources")]]
@@ -447,7 +466,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                         [Button.inline("🔙 Main Menu", "menu_main")]
                     ]
                     
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"✅ **GitHub Source Added Successfully!**\n\n"
                         f"🐙 **Repository:** {text}\n"
                         f"🎯 **Status:** Active and monitoring\n"
@@ -457,7 +476,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     
                 except Exception as e:
                     logger.error(f"Error adding GitHub source: {e}")
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"❌ **Error adding source:** {str(e)}\n\n"
                         f"Please try again or contact support.",
                         buttons=[[Button.inline("🔙 Back to Sources", "menu_sources")]]
@@ -486,7 +505,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                         [Button.inline("🔙 Main Menu", "menu_main")]
                     ]
                     
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"✅ **Discord Webhook Added Successfully!**\n\n"
                         f"💬 **Status:** Active and ready\n"
                         f"⚡ **Next:** Start receiving alerts!",
@@ -495,7 +514,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     
                 except Exception as e:
                     logger.error(f"Error adding Discord webhook: {e}")
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"❌ **Error adding webhook:** {str(e)}\n\n"
                         f"Please try again or contact support.",
                         buttons=[[Button.inline("🔙 Back to Outputs", "menu_outputs")]]
@@ -524,7 +543,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                         [Button.inline("🔙 Main Menu", "menu_main")]
                     ]
                     
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"✅ **Telegram Channel Added Successfully!**\n\n"
                         f"📱 **Channel:** {text}\n"
                         f"🎯 **Status:** Active and ready\n"
@@ -534,7 +553,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     
                 except Exception as e:
                     logger.error(f"Error adding Telegram channel: {e}")
-                    await event.reply(
+                    await safe_edit_event_message(event,
                         f"❌ **Error adding channel:** {str(e)}\n\n"
                         f"Please try again or contact support.",
                         buttons=[[Button.inline("🔙 Back to Outputs", "menu_outputs")]]
@@ -574,10 +593,11 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 📋 **View Active Sources** - See what's being tracked\n"
             f"• 🎯 **Smart Filters** - Set up keyword alerts\n"
             f"• ⏰ **Scan Schedules** - Optimize monitoring frequency\n\n"
-            f"*Ready to discover the next big thing?* 🚀"
+            f"*Ready to discover the next big thing?* ��"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_outputs"))
     async def menu_outputs_callback(event):
@@ -609,10 +629,11 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 💬 **Discord Webhooks** - Integrate with Discord servers\n"
             f"• ✨ **Custom Formats** - Style your alerts perfectly\n"
             f"• ⚡ **Smart Notifications** - Get alerts when it matters\n\n"
-            f"*Never miss a signal again!* 🔥"
+            f"*Never miss a signal again!* ��"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_ai"))
     async def menu_ai_callback(event):
@@ -647,8 +668,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 🎯 **Context-Aware Filtering** - Only relevant alerts\n\n"
             f"*Your AI-powered alpha hunting companion!* ⚡"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_settings"))
     async def menu_settings_callback(event):
@@ -680,10 +702,11 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 🔒 **Privacy** - Data handling and security\n"
             f"• 🗄️ **Data Management** - Storage and backup settings\n"
             f"• 🧹 **Cleanup** - Maintenance and cleanup options\n\n"
-            f"*Customize your alpha hunting experience!* 🎯"
+            f"*Customize your alpha hunting experience!* ��"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_stats"))
     async def menu_stats_callback(event):
@@ -721,10 +744,11 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 📈 **Graphs** - Visual performance data\n"
             f"• 📜 **History** - Historical trends\n"
             f"• ❌ **Errors** - Error tracking and analysis\n\n"
-            f"*Track your alpha hunting performance!* 🚀"
+            f"*Track your alpha hunting performance!* ��"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_help"))
     async def menu_help_callback(event):
@@ -756,10 +780,11 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 🔧 **Troubleshooting** - Common issues and solutions\n"
             f"• 💬 **Support** - Contact our support team\n"
             f"• 📰 **Updates** - Latest features and improvements\n\n"
-            f"*We're here to help you succeed!* 🤝"
+            f"*We're here to help you succeed!* ��"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="menu_main"))
     async def menu_main_callback(event):
@@ -786,8 +811,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
         new_text = (
             UI["messages"]["welcome"]
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     # Source management callbacks
     @client.on(events.CallbackQuery(data="source_add"))
@@ -820,10 +846,11 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• 📰 **RSS** - News feeds and blogs\n"
             f"• 🐙 **GitHub** - Repository updates\n"
             f"• 🐦 **X/Twitter** - Social media signals\n\n"
-            f"*Select where you want to discover the next big thing!* 🚀"
+            f"*Select where you want to discover the next big thing!* ��"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_telegram_source"))
     async def add_telegram_source_callback(event):
@@ -849,8 +876,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"*Ready to catch that alpha?* 🚀\n\n"
             f"**Type the @username or group ID below:**"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_discord_source"))
     async def add_discord_source_callback(event):
@@ -877,8 +905,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"*Let's hunt some Discord alpha!* 🔥\n\n"
             f"**Type the server ID below:**"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_reddit_source"))
     async def add_reddit_source_callback(event):
@@ -907,8 +936,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"*Reddit alpha is waiting!* 🚀\n\n"
             f"**Type the subreddit name below:**"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_twitter_source"))
     async def add_twitter_source_callback(event):
@@ -938,8 +968,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"*Twitter alpha is waiting!* 🚀\n\n"
             f"**Type the username below:**"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_rss_source"))
     async def add_rss_source_callback(event):
@@ -966,8 +997,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"*Stay ahead with RSS alpha!* 📰\n\n"
             f"**Type the RSS URL below:**"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_github_source"))
     async def add_github_source_callback(event):
@@ -995,8 +1027,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"*GitHub alpha is waiting!* 🚀\n\n"
             f"**Type the repository (owner/repo) below:**"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     # Output management callbacks
     @client.on(events.CallbackQuery(data="output_add"))
@@ -1028,10 +1061,11 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Rich formatting\n"
             f"• Custom templates\n"
             f"• Delivery confirmation\n\n"
-            f"*Never miss important signals!* 🔥"
+            f"*Never miss important signals!* ��"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_telegram_channel"))
     async def add_telegram_channel_callback(event):
@@ -1058,8 +1092,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"*Ready to receive alpha alerts!* 🚀\n\n"
             f"**Type the channel/group below:**"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_discord_webhook"))
     async def add_discord_webhook_callback(event):
@@ -1089,8 +1124,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"*Ready to send Discord alerts!* 🔥\n\n"
             f"**Type the webhook URL below:**"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="add_dashboard_output"))
     async def add_dashboard_output_callback(event):
@@ -1112,10 +1148,11 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             f"• Source management\n"
             f"• Statistics and graphs\n"
             f"• Settings configuration\n\n"
-            f"*Your web dashboard is ready!* 🚀"
+            f"*Your web dashboard is ready!* ��"
         )
-        if event.text != new_text:
-            await event.edit(new_text, buttons=keyboard)
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
 
     # View sources and outputs
     @client.on(events.CallbackQuery(data="source_list"))
@@ -1140,7 +1177,7 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     [Button.inline("🔙 Back to Sources", "menu_sources")]
                 ]
                 new_text = (
-                    f"�� **ACTIVE SOURCES** 📋\n\n"
+                    f"📋 **ACTIVE SOURCES** 📋\n\n"
                     f"❌ **No sources found**\n\n"
                     f"🎯 **Get started by adding your first source!**\n"
                     f"• 📱 Telegram groups\n"
@@ -1149,8 +1186,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     f"• 🐦 Twitter accounts\n\n"
                     f"*Ready to start hunting alpha?* 🚀"
                 )
-                if event.text != new_text:
-                    await event.edit(new_text, buttons=keyboard)
+                message = await event.get_message()
+                if message.text != new_text:
+                    await safe_edit_event_message(event, new_text, buttons=keyboard)
             else:
                 source_list = "\n".join([
                     f"• {src['type']}: {src['name']}" for src in source_dicts[:10]
@@ -1166,18 +1204,15 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     f"{'... and more' if len(source_dicts) > 10 else ''}\n\n"
                     f"🎯 **All sources are actively monitoring for alpha!**"
                 )
-                if event.text != new_text:
-                    await event.edit(new_text, buttons=keyboard)
+                message = await event.get_message()
+                if message.text != new_text:
+                    await safe_edit_event_message(event, new_text, buttons=keyboard)
         except Exception as e:
             logger.error(f"Error listing sources: {e}")
             keyboard = [
                 [Button.inline("🔙 Back to Sources", "menu_sources")]
             ]
-            await event.edit(
-                f"❌ **Error loading sources**\n\n"
-                f"Please try again or contact support.",
-                buttons=keyboard
-            )
+            await safe_edit_event_message(event, f"❌ **Error loading sources**\n\nPlease try again or contact support.", buttons=keyboard)
 
     @client.on(events.CallbackQuery(data="output_list"))
     async def output_list_callback(event):
@@ -1199,12 +1234,13 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     [Button.inline("🔙 Back to Outputs", "menu_outputs")]
                 ]
                 new_text = (
-                    f"�� **ACTIVE OUTPUTS** 📢\n\n"
+                    f"📢 **ACTIVE OUTPUTS** 📢\n\n"
                     f"❌ **No outputs found**\n\n"
-                    f"*Add an output channel to start receiving alerts!* ��"
+                    f"*Add an output channel to start receiving alerts!* 📢"
                 )
-                if event.text != new_text:
-                    await event.edit(new_text, buttons=keyboard)
+                message = await event.get_message()
+                if message.text != new_text:
+                    await safe_edit_event_message(event, new_text, buttons=keyboard)
             else:
                 output_list = "\n".join([
                     f"• {out['type']}: {out['name']}" for out in output_dicts[:10]
@@ -1220,15 +1256,128 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                     f"{'... and more' if len(output_dicts) > 10 else ''}\n\n"
                     f"*All outputs are ready to deliver alerts!* 🚀"
                 )
-                if event.text != new_text:
-                    await event.edit(new_text, buttons=keyboard)
+                message = await event.get_message()
+                if message.text != new_text:
+                    await safe_edit_event_message(event, new_text, buttons=keyboard)
         except Exception as e:
             logger.error(f"Error listing outputs: {e}")
             keyboard = [
                 [Button.inline("🔙 Back to Outputs", "menu_outputs")]
             ]
-            await event.edit(
-                f"❌ **Error loading outputs**\n\n"
-                f"Please try again or contact support.",
-                buttons=keyboard
-            )
+            await safe_edit_event_message(event, f"❌ **Error loading outputs**\n\nPlease try again or contact support.", buttons=keyboard)
+
+    # --- PLACEHOLDER HANDLERS FOR ALL BUTTONS ---
+    # Utility for placeholder
+    async def placeholder_handler(event, title, back_data, back_text):
+        keyboard = [[Button.inline(back_text, back_data)]]
+        new_text = f"{title}\n\n🚧 This feature is coming soon!"
+        message = await event.get_message()
+        if message.text != new_text:
+            await safe_edit_event_message(event, new_text, buttons=keyboard)
+
+    # Source Filters
+    @client.on(events.CallbackQuery(data="source_filters"))
+    async def source_filters_callback(event):
+        await placeholder_handler(event, "🔍 Source Filters", "menu_sources", "🔙 Back to Sources")
+
+    # Source Schedule
+    @client.on(events.CallbackQuery(data="source_schedule"))
+    async def source_schedule_callback(event):
+        await placeholder_handler(event, "⏰ Source Schedule", "menu_sources", "🔙 Back to Sources")
+
+    # AI Menu
+    @client.on(events.CallbackQuery(data="ai_toggle"))
+    async def ai_toggle_callback(event):
+        await placeholder_handler(event, "🎯 Toggle AI Features", "menu_ai", "🔙 Back to AI Menu")
+
+    @client.on(events.CallbackQuery(data="ai_settings"))
+    async def ai_settings_callback(event):
+        await placeholder_handler(event, "📋 AI Settings", "menu_ai", "🔙 Back to AI Menu")
+
+    @client.on(events.CallbackQuery(data="ai_stats"))
+    async def ai_stats_callback(event):
+        await placeholder_handler(event, "📊 AI Stats", "menu_ai", "🔙 Back to AI Menu")
+
+    @client.on(events.CallbackQuery(data="ai_help"))
+    async def ai_help_callback(event):
+        await placeholder_handler(event, "❓ AI Help", "menu_ai", "🔙 Back to AI Menu")
+
+    # Settings
+    @client.on(events.CallbackQuery(data="settings_general"))
+    async def settings_general_callback(event):
+        await placeholder_handler(event, "⚙️ General Settings", "menu_settings", "🔙 Back to Settings")
+
+    @client.on(events.CallbackQuery(data="settings_notify"))
+    async def settings_notify_callback(event):
+        await placeholder_handler(event, "🔔 Notification Settings", "menu_settings", "🔙 Back to Settings")
+
+    @client.on(events.CallbackQuery(data="settings_perf"))
+    async def settings_perf_callback(event):
+        await placeholder_handler(event, "🚀 Performance Settings", "menu_settings", "🔙 Back to Settings")
+
+    @client.on(events.CallbackQuery(data="settings_privacy"))
+    async def settings_privacy_callback(event):
+        await placeholder_handler(event, "🔒 Privacy Settings", "menu_settings", "🔙 Back to Settings")
+
+    @client.on(events.CallbackQuery(data="settings_data"))
+    async def settings_data_callback(event):
+        await placeholder_handler(event, "🗄️ Data Management", "menu_settings", "🔙 Back to Settings")
+
+    @client.on(events.CallbackQuery(data="settings_cleanup"))
+    async def settings_cleanup_callback(event):
+        await placeholder_handler(event, "🧹 Cleanup Settings", "menu_settings", "🔙 Back to Settings")
+
+    # Stats
+    @client.on(events.CallbackQuery(data="stats_detail"))
+    async def stats_detail_callback(event):
+        await placeholder_handler(event, "📊 Detailed Stats", "menu_stats", "🔙 Back to Stats")
+
+    @client.on(events.CallbackQuery(data="stats_graphs"))
+    async def stats_graphs_callback(event):
+        await placeholder_handler(event, "📈 Stats Graphs", "menu_stats", "🔙 Back to Stats")
+
+    @client.on(events.CallbackQuery(data="stats_history"))
+    async def stats_history_callback(event):
+        await placeholder_handler(event, "📜 Stats History", "menu_stats", "🔙 Back to Stats")
+
+    @client.on(events.CallbackQuery(data="stats_errors"))
+    async def stats_errors_callback(event):
+        await placeholder_handler(event, "❌ Stats Errors", "menu_stats", "🔙 Back to Stats")
+
+    @client.on(events.CallbackQuery(data="stats_refresh"))
+    async def stats_refresh_callback(event):
+        await placeholder_handler(event, "🔄 Refresh Stats", "menu_stats", "🔙 Back to Stats")
+
+    @client.on(events.CallbackQuery(data="stats_dash"))
+    async def stats_dash_callback(event):
+        await placeholder_handler(event, "🌐 Dashboard Stats", "menu_stats", "🔙 Back to Stats")
+
+    # Help
+    @client.on(events.CallbackQuery(data="help_guide"))
+    async def help_guide_callback(event):
+        await placeholder_handler(event, "📖 User Guide", "menu_help", "🔙 Back to Help")
+
+    @client.on(events.CallbackQuery(data="help_faq"))
+    async def help_faq_callback(event):
+        await placeholder_handler(event, "❓ FAQ", "menu_help", "🔙 Back to Help")
+
+    @client.on(events.CallbackQuery(data="help_tutorial"))
+    async def help_tutorial_callback(event):
+        await placeholder_handler(event, "🎓 Tutorial", "menu_help", "🔙 Back to Help")
+
+    @client.on(events.CallbackQuery(data="help_trouble"))
+    async def help_trouble_callback(event):
+        await placeholder_handler(event, "🔧 Troubleshooting", "menu_help", "🔙 Back to Help")
+
+    @client.on(events.CallbackQuery(data="help_support"))
+    async def help_support_callback(event):
+        await placeholder_handler(event, "💬 Support", "menu_help", "🔙 Back to Help")
+
+    @client.on(events.CallbackQuery(data="help_updates"))
+    async def help_updates_callback(event):
+        await placeholder_handler(event, "📰 Updates", "menu_help", "🔙 Back to Help")
+
+    # Output management - Email output
+    @client.on(events.CallbackQuery(data="add_email_output"))
+    async def add_email_output_callback(event):
+        await placeholder_handler(event, "📧 Add Email Output", "output_add", "�� Back to Outputs")
