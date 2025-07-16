@@ -62,8 +62,8 @@ async function loadStats() {
   const res = await fetch('/api/stats');
   const data = await res.json();
   activeSourcesCount.textContent = data.stats.sources;
-  messagesToday.textContent = Math.floor(Math.random() * 1000 + 100); // Demo
-  tokenMentions.textContent = Math.floor(Math.random() * 500 + 50); // Demo
+  messagesToday.textContent = data.stats.messages_today;
+  tokenMentions.textContent = data.stats.token_mentions;
   alertsToday.textContent = data.stats.alerts_sent;
 }
 
@@ -114,10 +114,13 @@ async function loadTokens() {
   const tokensList = document.getElementById('tokensList');
   tokensList.innerHTML = '<p>Loading tokens...</p>';
   try {
-    const res = await fetch('/api/stats');
+    const res = await fetch('/api/tokens');
     const data = await res.json();
-    // Demo: just show number of tokens monitored
-    tokensList.innerHTML = `<div class="token-summary">Tokens Monitored: <b>${data.stats.tokens_monitored}</b></div>`;
+    if (data.tokens && data.tokens.length > 0) {
+      tokensList.innerHTML = data.tokens.map(token => `<div class="token-summary">${token.name} (${token.symbol}) - <b>${token.address}</b></div>`).join('');
+    } else {
+      tokensList.innerHTML = '<p>No tokens found.</p>';
+    }
   } catch (e) {
     tokensList.innerHTML = '<p>Failed to load tokens.</p>';
   }

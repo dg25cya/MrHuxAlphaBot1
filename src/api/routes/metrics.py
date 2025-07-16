@@ -37,12 +37,12 @@ async def get_token_processing_metrics(
 ) -> Dict[str, Any]:
     """Get token processing metrics."""
     since = datetime.utcnow() - WINDOW_MAP[time_window]
-    
+    # TODO: Implement real metrics aggregation from database
     return {
-        "processing_time_avg": 0.5,  # Placeholder
-        "tokens_validated": 0,  # Placeholder
-        "validation_success_rate": 0.95,  # Placeholder
-        "tokens_by_source": {}  # Placeholder
+        "processing_time_avg": 0,
+        "tokens_validated": 0,
+        "validation_success_rate": 0,
+        "tokens_by_source": {}
     }
 
 @router.get("/message-processing")
@@ -52,11 +52,11 @@ async def get_message_processing_metrics(
 ) -> Dict[str, Any]:
     """Get message processing metrics."""
     since = datetime.utcnow() - WINDOW_MAP[time_window]
-    
+    # TODO: Implement real metrics aggregation from database
     return {
-        "messages_processed": 0,  # Placeholder
-        "processing_success_rate": 0.98,  # Placeholder
-        "messages_by_group": {}  # Placeholder
+        "messages_processed": 0,
+        "processing_success_rate": 0,
+        "messages_by_group": {}
     }
 
 @router.get("/alert-generation")
@@ -80,23 +80,24 @@ async def get_api_metrics(
 ) -> Dict[str, Any]:
     """Get API performance metrics."""
     since = datetime.utcnow() - WINDOW_MAP[time_window]
-    
+    # TODO: Implement real API metrics aggregation
     return {
-        "request_count": 0,  # Placeholder
-        "average_latency": 0.1,  # Placeholder
-        "requests_by_endpoint": {},  # Placeholder
-        "error_rate": 0.01  # Placeholder
+        "request_count": 0,
+        "average_latency": 0,
+        "requests_by_endpoint": {},
+        "error_rate": 0
     }
 
 @router.get("/health")
 async def get_health_metrics(_: bool = Depends(admin_only)) -> Dict[str, Any]:
     """Get current health metrics."""
+    # TODO: Implement real health metrics
     return {
-        "uptime": 0,  # Placeholder
-        "memory_usage": 0,  # Placeholder
-        "cpu_usage": 0,  # Placeholder
-        "message_queue_size": 0,  # Placeholder
-        "error_rate": 0.01,  # Placeholder
-        "last_message_processed": datetime.utcnow().isoformat(),  # Placeholder
-        "active_connections": 0  # Placeholder
+        "uptime": 0,
+        "memory_usage": 0,
+        "cpu_usage": 0,
+        "message_queue_size": 0,
+        "error_rate": 0,
+        "last_message_processed": datetime.utcnow().isoformat(),
+        "active_connections": 0
     }
