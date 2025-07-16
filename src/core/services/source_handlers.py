@@ -8,10 +8,12 @@ import discord
 from discord.ext import commands
 from loguru import logger
 import aiohttp
+from typing import Optional
 
 from src.models.monitored_source import MonitoredSource, SourceType
 from src.utils.db import db_session
 from src.config.settings import get_settings
+from src.core.services.parser import TokenParser
 
 settings = get_settings()
 
@@ -79,12 +81,16 @@ class SourceManager:
     async def scan_source(
         self,
         source: MonitoredSource,
-        telegram_client: TelegramClient = None
+        telegram_client: Optional[TelegramClient] = None
     ) -> list:
         """Scan a source for new content."""
         try:
             if source.type == SourceType.TELEGRAM:
-                return await self._scan_telegram(source, telegram_client)
+                if telegram_client is not None:
+                    return await self._scan_telegram(source, telegram_client)
+                else:
+                    logger.error("No Telegram client provided for Telegram source.")
+                    return []
             elif source.type == SourceType.DISCORD:
                 return await self._scan_discord(source)
             elif source.type == SourceType.REDDIT:
@@ -93,12 +99,10 @@ class SourceManager:
                 return await self._scan_rss(source)
             elif source.type == SourceType.GITHUB:
                 return await self._scan_github(source)
-            elif source.type == SourceType.TWITTER:
+            elif source.type == SourceType.X:
                 return await self._scan_twitter(source)
             elif source.type == SourceType.BONK:
                 return await self._scan_bonk(source)
-            elif source.type == SourceType.DEX:
-                return await self._scan_dex(source)
             else:
                 logger.warning(f"Unknown source type: {source.type}")
                 return []
@@ -112,16 +116,26 @@ class SourceManager:
         """Scan all active sources and send detected plays to output service."""
         from src.models.monitored_source import MonitoredSource
         from src.utils.db import db_session
+        from src.core.services.parser import TokenParser
         plays_found = []
+        token_parser = TokenParser()
         with db_session() as db:
-            sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == True).all()
+            sources = db.query(MonitoredSource).filter(MonitoredSource.is_active.is_(True)).all()
             for source in sources:
                 try:
                     results = await self.scan_source(source, telegram_client)
-                    for play in results:
-                        plays_found.append(play)
-                        if output_service:
-                            await output_service.send_alert(play)
+                    for message in results:
+                        # Parse each message for token mentions
+                        tokens = await token_parser.parse_message(
+                            message.get("text", ""),
+                            channel_id=None,
+                            message_id=None,
+                            image_urls=message.get("attachments", [])
+                        )
+                        for token in tokens:
+                            plays_found.append(token)
+                            if output_service:
+                                await output_service.send_alert(token)
                 except Exception as e:
                     logger.error(f"Error scanning source {source.id}: {e}")
         return plays_found
@@ -140,7 +154,7 @@ class SourceManager:
             messages = []
             
             # Handle different identifier formats
-            entity_id = source.identifier
+            entity_id = str(source.identifier)
             
             # If it's a username (starts with @), remove the @
             if entity_id.startswith('@'):
