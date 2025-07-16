@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import logging
 from sqlalchemy import text
+from loguru import logger
+from sqlalchemy import true
 
 from src.database import get_db
 from src.models.monitored_source import MonitoredSource
@@ -12,6 +14,7 @@ from src.models.output_channel import OutputChannel
 from src.models.notification_channel import NotificationChannel
 from src.models.alert import Alert
 from src.models.token import Token
+from src.models.mention import TokenMention
 
 router = APIRouter()
 
@@ -41,9 +44,9 @@ manager = ConnectionManager()
 def get_real_stats(db: Session) -> dict:
     """Get real statistics from database."""
     try:
-        active_sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == True).count()
-        active_outputs = db.query(OutputChannel).filter(OutputChannel.is_active == True).count()
-        active_notifications = db.query(NotificationChannel).filter(NotificationChannel.is_active == True).count()
+        active_sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == true()).count()
+        active_outputs = db.query(OutputChannel).filter(OutputChannel.is_active == true()).count()
+        active_notifications = db.query(NotificationChannel).filter(NotificationChannel.is_active == true()).count()
         tokens_monitored = db.query(Token).count()
         yesterday = datetime.utcnow() - timedelta(days=1)
         recent_alerts = db.query(Alert).filter(Alert.created_at >= yesterday).count()
@@ -76,7 +79,7 @@ def get_real_stats(db: Session) -> dict:
 def get_real_sources(db: Session) -> List[dict]:
     """Get real sources from database."""
     try:
-        sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == True).all()
+        sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == true()).all()
         return [
             {
                 "id": source.id,
@@ -94,8 +97,8 @@ def get_real_sources(db: Session) -> List[dict]:
 def get_real_outputs(db: Session) -> List[dict]:
     """Get real outputs from database."""
     try:
-        outputs = db.query(OutputChannel).filter(OutputChannel.is_active == True).all()
-        notifications = db.query(NotificationChannel).filter(NotificationChannel.is_active == True).all()
+        outputs = db.query(OutputChannel).filter(OutputChannel.is_active == true()).all()
+        notifications = db.query(NotificationChannel).filter(NotificationChannel.is_active == true()).all()
         
         result = []
         for output in outputs:
@@ -103,7 +106,7 @@ def get_real_outputs(db: Session) -> List[dict]:
                 "id": output.id,
                 "type": output.type,
                 "name": output.name or output.identifier,
-                "status": "active" if output.is_active else "inactive"
+                "status": "active" if bool(output.is_active) else "inactive"
             })
         
         for notif in notifications:
@@ -111,7 +114,7 @@ def get_real_outputs(db: Session) -> List[dict]:
                 "id": notif.id,
                 "type": notif.type,
                 "name": notif.name or str(notif.channel_id),
-                "status": "active" if notif.is_active else "inactive"
+                "status": "active" if bool(notif.is_active) else "inactive"
             })
         
         return result
@@ -162,7 +165,7 @@ async def get_alerts(db: Session = Depends(get_db)):
 async def get_stats(db: Session = Depends(get_db)):
     """Get bot statistics."""
     # Real stats: messages today, token mentions, alerts sent
-    from src.models.token_mention import TokenMention
+    from src.models.mention import TokenMention
     from src.models.alert import Alert
     from src.models.token import Token
     from datetime import datetime, timedelta
@@ -176,7 +179,7 @@ async def get_stats(db: Session = Depends(get_db)):
             "messages_today": messages_today,
             "token_mentions": token_mentions,
             "alerts_sent": alerts_sent,
-            "sources": db.query(MonitoredSource).filter(MonitoredSource.is_active == True).count()
+            "sources": db.query(MonitoredSource).filter(MonitoredSource.is_active == true()).count()
         }
     }
 
@@ -223,7 +226,7 @@ async def remove_source(source_id: int, db: Session = Depends(get_db)):
     try:
         source = db.query(MonitoredSource).filter(MonitoredSource.id == source_id).first()
         if source:
-            source.is_active = False
+            setattr(source, 'is_active', False)
             db.commit()
             
             # Broadcast update to WebSocket clients
