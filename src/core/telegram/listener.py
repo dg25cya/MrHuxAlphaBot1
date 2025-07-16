@@ -4,6 +4,8 @@ from functools import wraps
 import asyncio
 import re
 from datetime import datetime, timedelta
+import os
+import json
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -29,6 +31,7 @@ from src.core.services.text_analysis import deepseek_analyze
 from src.models.output_channel import OutputChannel, OutputType
 from src.core.services.output_service import OutputService
 from src.core.services.token_monitor import TokenMonitor
+from src.utils.redis_cache import RedisCache
 
 settings = get_settings()
 
@@ -372,6 +375,46 @@ async def scan_last_30min_messages(client: TelegramClient, db: Session, sources=
             logger.error(f"Failed to scan messages for {source.name} ({source.identifier}): {e}")
     logger.info("Finished scanning last 30 minutes of messages.")
 
+async def log_bot_startup(client, db):
+    logger.info(f"[BOT] Starting Telegram bot...")
+    db_path = os.environ.get('DATABASE_URL') or getattr(db.bind, 'url', None)
+    logger.info(f"[BOT] Using database: {db_path}")
+    from src.models.monitored_source import MonitoredSource
+    sources = db.query(MonitoredSource).all()
+    logger.info(f"[BOT] Loaded {len(sources)} sources from database:")
+    for s in sources:
+        logger.info(f"[BOT] Source: id={s.id} type={s.type} identifier={s.identifier} name={s.name} is_active={s.is_active}")
+    return sources
+
+async def get_sources_summary(db):
+    from src.models.monitored_source import MonitoredSource
+    sources = db.query(MonitoredSource).all()
+    return '\n'.join([f"[{s.id}] {s.type} {s.identifier} {s.name} active={s.is_active}" for s in sources])
+
+async def redis_source_sync_loop(client, db):
+    try:
+        redis = RedisCache()
+        await redis.initialize()
+        pubsub = await redis._redis.pubsub()
+        await pubsub.subscribe('source_updates')
+        logger.info("[BOT] Subscribed to Redis channel 'source_updates' for real-time source sync.")
+        while True:
+            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if message and message['type'] == 'message':
+                logger.info(f"[BOT] Received source update from Redis: {message['data']}")
+                # Reload sources from DB and update monitoring
+                await log_bot_startup(client, db)
+                await scan_last_30min_messages(client, db)
+            await asyncio.sleep(1)
+    except Exception as e:
+        logger.error(f"[BOT] Redis source sync loop error: {e}")
+        logger.warning("[BOT] Falling back to periodic polling for source sync.")
+        # Fallback: poll every 60 seconds
+        while True:
+            await log_bot_startup(client, db)
+            await scan_last_30min_messages(client, db)
+            await asyncio.sleep(60)
+
 # Patch setup_message_handler to call scan_last_30min_messages on startup
 async def setup_message_handler(client: TelegramClient, db=None, text_analyzer=None):
     """Setup message handler for the bot."""
@@ -391,5 +434,8 @@ async def setup_message_handler(client: TelegramClient, db=None, text_analyzer=N
     # Scan last 30 minutes of messages on startup
     if db is None:
         db = SessionLocal()
+    await log_bot_startup(client, db)
     await scan_last_30min_messages(client, db)
     logger.info("Message handler and batch processor setup complete")
+    # Start Redis sync loop in background
+    asyncio.create_task(redis_source_sync_loop(client, db))

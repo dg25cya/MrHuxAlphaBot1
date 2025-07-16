@@ -15,6 +15,7 @@ from src.core.services.source_handlers import SourceManager
 from src.core.services.output_service import OutputService
 from src.core.services.text_analysis import TextAnalysisService
 from src.utils.db import db_session
+from src.core.telegram.listener import get_sources_summary
 
 settings = get_settings()
 
@@ -1834,6 +1835,30 @@ async def setup_command_handlers(client: TelegramClient, db=None):
 
     @client.on(events.NewMessage(pattern='/whereami'))
     async def whereami_command(event: Message):
-        chat_id = getattr(event.chat, 'id', None)
-        username = getattr(event.chat, 'username', None)
-        await event.reply(f"chat_id: {chat_id}\nusername: @{username if username else 'N/A'}")
+        """Reply with bot status, DB path, number of sources, and outputs."""
+        from src.database import SessionLocal
+        import os
+        db = SessionLocal()
+        db_path = os.environ.get('DATABASE_URL') or getattr(db.bind, 'url', None)
+        from src.models.monitored_source import MonitoredSource
+        from src.models.output_channel import OutputChannel
+        sources = db.query(MonitoredSource).all()
+        outputs = db.query(OutputChannel).all()
+        text = (
+            f"🤖 <b>MR HUX Alpha Bot Status</b> 🤖\n"
+            f"<b>DB:</b> {db_path}\n"
+            f"<b>Sources:</b> {len(sources)}\n"
+            f"<b>Outputs:</b> {len(outputs)}\n"
+            f"<b>Active:</b> {sum(1 for s in sources if bool(s.is_active))} sources, {sum(1 for o in outputs if bool(o.is_active))} outputs\n"
+        )
+        await event.reply(text, parse_mode='html')
+        db.close()
+
+    @client.on(events.NewMessage(pattern='/sources'))
+    async def sources_command(event: Message):
+        """Reply with a list of all monitored sources."""
+        from src.database import SessionLocal
+        db = SessionLocal()
+        summary = await get_sources_summary(db)
+        await event.reply(f"<b>Monitored Sources:</b>\n{summary}", parse_mode='html')
+        db.close()

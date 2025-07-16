@@ -1,6 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from typing import List
 import asyncio
+import json
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import logging
@@ -15,6 +16,7 @@ from src.models.notification_channel import NotificationChannel
 from src.models.alert import Alert
 from src.models.token import Token
 from src.models.mention import TokenMention
+from src.utils.redis_cache import RedisCache
 
 router = APIRouter()
 
@@ -203,13 +205,19 @@ async def add_source(source: dict, db: Session = Depends(get_db)):
         db.add(new_source)
         db.commit()
         db.refresh(new_source)
-        
         # Broadcast update to WebSocket clients
         await manager.broadcast({
             "type": "source_added",
             "data": {"id": new_source.id, "type": new_source.type, "name": new_source.name}
         })
-        
+        # Publish to Redis for real-time bot sync
+        try:
+            redis = RedisCache()
+            await redis.initialize()
+            await redis._redis.publish('source_updates', json.dumps({"action": "add", "id": new_source.id}))
+            await redis.close()
+        except Exception as e:
+            logger.error(f"Failed to publish source add to Redis: {e}")
         return {"success": True, "source": {
             "id": new_source.id,
             "type": new_source.type,
@@ -228,13 +236,19 @@ async def remove_source(source_id: int, db: Session = Depends(get_db)):
         if source:
             setattr(source, 'is_active', False)
             db.commit()
-            
             # Broadcast update to WebSocket clients
             await manager.broadcast({
                 "type": "source_removed",
                 "data": {"id": source_id}
             })
-            
+            # Publish to Redis for real-time bot sync
+            try:
+                redis = RedisCache()
+                await redis.initialize()
+                await redis._redis.publish('source_updates', json.dumps({"action": "remove", "id": source_id}))
+                await redis.close()
+            except Exception as e:
+                logger.error(f"Failed to publish source remove to Redis: {e}")
             return {"success": True}
         return {"success": False, "error": "Source not found"}
     except Exception as e:
