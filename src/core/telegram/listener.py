@@ -251,6 +251,10 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
         log_message_processed("invalid_message")
         return
     msg = event.message
+    # Deep logging: log every message
+    chat_id = getattr(msg, 'chat_id', None)
+    username = getattr(msg.chat, 'username', None) if hasattr(msg, 'chat') and hasattr(msg.chat, 'username') else None
+    logger.info(f"[BOT] Received message: chat_id={chat_id}, username={username}, text={msg.text}")
     if not msg.text:
         log_message_processed("no_text")
         return
@@ -273,10 +277,15 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
                 username = None
                 if hasattr(msg, 'chat') and hasattr(msg.chat, 'username') and msg.chat.username:
                     username = '@' + msg.chat.username.lower()
+                logger.info(f"[BOT] Checking monitored sources for chat_id={chat_id_str}, username={username}")
                 source = db.query(MonitoredSource).filter(
                     (MonitoredSource.identifier == chat_id_str) |
                     ((MonitoredSource.identifier.ilike(username)) if username else False)
                 ).filter(MonitoredSource.is_active == True).first()
+                if source:
+                    logger.info(f"[BOT] Matched monitored source: {source.id} {source.identifier} {source.name}")
+                else:
+                    logger.warning(f"[BOT] No monitored source matched for chat_id={chat_id_str}, username={username}")
                 if source and source.custom_filters:
                     filters = source.custom_filters.get("keywords", [])
                     if filters:
@@ -305,6 +314,7 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
                 msg.chat_id, 
                 msg.id
             )
+            logger.info(f"[BOT] TokenParser found tokens: {tokens}")
             if not tokens:
                 log_message_processed("no_tokens")
                 return
@@ -320,6 +330,7 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
                     return
             try:
                 for token_match in tokens:
+                    logger.info(f"[BOT] Processing token: {token_match}")
                     result = await process_token(
                         token_address=token_match["address"],
                         message_text=msg.text,
@@ -328,10 +339,7 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
                         db=db
                     )
                     if result:
-                        logger.info(
-                            f"Processed token {token_match['address']} "
-                            f"from group {msg.chat_id}"
-                        )
+                        logger.info(f"[BOT] Processed and alerted token {token_match['address']} from group {msg.chat_id}")
             finally:
                 if session is None and db:
                     try:
@@ -343,18 +351,17 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
         logger.exception(f"Error processing message: {e}")
         log_message_processed("processing_error")
 
-async def scan_last_30min_messages(client: TelegramClient, db: Session):
-    """Scan last 30 minutes of messages for all monitored Telegram sources."""
+async def scan_last_30min_messages(client: TelegramClient, db: Session, sources=None):
+    """Scan last 30 minutes of messages for all or specific monitored Telegram sources."""
     from src.models.monitored_source import MonitoredSource
-    logger.info("Scanning last 30 minutes of messages for all monitored Telegram sources...")
-    sources = db.query(MonitoredSource).filter(MonitoredSource.type == 'telegram', MonitoredSource.is_active == True).all()
+    logger.info("Scanning last 30 minutes of messages for Telegram sources...")
+    if sources is None:
+        sources = db.query(MonitoredSource).filter(MonitoredSource.type == 'telegram', MonitoredSource.is_active == True).all()
     for source in sources:
         try:
             chat_id = source.identifier
             logger.info(f"Scanning group/channel: {source.name} ({chat_id})")
-            # Fetch last 30 minutes of messages
             async for msg in client.iter_messages(chat_id, offset_date=datetime.utcnow() - timedelta(minutes=30)):
-                # Simulate a NewMessage.Event for each message
                 class DummyEvent:
                     pass
                 event = DummyEvent()

@@ -146,14 +146,39 @@ def get_real_alerts(db: Session, limit: int = 50) -> List[dict]:
 @router.get("/alerts")
 async def get_alerts(db: Session = Depends(get_db)):
     """Get recent alerts."""
-    alerts = get_real_alerts(db)
-    return {"alerts": alerts}
+    from src.models.alert import Alert
+    alerts = db.query(Alert).order_by(Alert.created_at.desc()).limit(50).all()
+    return {"alerts": [
+        {
+            "id": a.id,
+            "message": getattr(a, 'message', ''),
+            "type": getattr(a, 'alert_type', ''),
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "severity": getattr(a, 'severity', 'info')
+        } for a in alerts
+    ]}
 
 @router.get("/stats")
 async def get_stats(db: Session = Depends(get_db)):
     """Get bot statistics."""
-    stats = get_real_stats(db)
-    return {"stats": stats}
+    # Real stats: messages today, token mentions, alerts sent
+    from src.models.token_mention import TokenMention
+    from src.models.alert import Alert
+    from src.models.token import Token
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    messages_today = db.query(TokenMention).filter(TokenMention.mentioned_at >= today).count()
+    token_mentions = db.query(TokenMention).count()
+    alerts_sent = db.query(Alert).filter(Alert.created_at >= today).count()
+    return {
+        "stats": {
+            "messages_today": messages_today,
+            "token_mentions": token_mentions,
+            "alerts_sent": alerts_sent,
+            "sources": db.query(MonitoredSource).filter(MonitoredSource.is_active == True).count()
+        }
+    }
 
 @router.get("/sources")
 async def get_sources(db: Session = Depends(get_db)):

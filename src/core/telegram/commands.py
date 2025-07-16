@@ -273,6 +273,20 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                         source = MonitoredSource(**source_data)
                         db.add(source)
                         db.commit()
+                        # After adding, scan last 30 minutes of messages for this source
+                        from src.core.telegram.listener import scan_last_30min_messages
+                        import asyncio
+                        # Only scan this new source
+                        class DummySource:
+                            def __init__(self, identifier, name):
+                                self.identifier = identifier
+                                self.name = name
+                                self.type = 'telegram'
+                                self.is_active = True
+                        dummy_source = DummySource(identifier, name)
+                        async def scan_new_source():
+                            await scan_last_30min_messages(client, db, sources=[dummy_source])
+                        asyncio.create_task(scan_new_source())
                     # Clear user state
                     del user_states[user_id]
                     keyboard = [
@@ -1817,3 +1831,9 @@ async def setup_command_handlers(client: TelegramClient, db=None):
                 db.commit()
                 await event.reply(f"✅ Email output added: {email}")
         del user_states[user_id]
+
+    @client.on(events.NewMessage(pattern='/whereami'))
+    async def whereami_command(event: Message):
+        chat_id = getattr(event.chat, 'id', None)
+        username = getattr(event.chat, 'username', None)
+        await event.reply(f"chat_id: {chat_id}\nusername: @{username if username else 'N/A'}")
