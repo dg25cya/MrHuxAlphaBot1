@@ -143,14 +143,46 @@ async function loadAlerts() {
   }
 }
 
-// --- Load Settings (Placeholder) ---
+// --- Load Settings (Editable) ---
 async function loadSettings() {
   const settingsPanel = document.getElementById('settingsPanel');
   settingsPanel.innerHTML = '<p>Loading settings...</p>';
   try {
     const res = await fetch('/api/config');
     const data = await res.json();
-    settingsPanel.innerHTML = `<pre>${JSON.stringify(data.config, null, 2)}</pre>`;
+    const config = data.config;
+    settingsPanel.innerHTML = `
+      <form id="settingsForm">
+        <label>Alert Threshold: <input type="number" step="1" min="1" max="100" name="alert_threshold" value="${config.alert_threshold}" required></label><br>
+        <label>Theme:
+          <select name="theme">
+            <option value="dark" ${config.theme === 'dark' ? 'selected' : ''}>Dark</option>
+            <option value="light" ${config.theme === 'light' ? 'selected' : ''}>Light</option>
+          </select>
+        </label><br>
+        <label>Auto Refresh: <input type="checkbox" name="auto_refresh" ${config.auto_refresh ? 'checked' : ''}></label><br>
+        <label>Notifications: <input type="checkbox" name="notifications" ${config.notifications ? 'checked' : ''}></label><br>
+        <button type="submit">Save Settings</button>
+      </form>
+      <div id="settingsMsg"></div>
+    `;
+    document.getElementById('settingsForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const newConfig = {
+        alert_threshold: parseInt(form.alert_threshold.value, 10),
+        theme: form.theme.value,
+        auto_refresh: form.auto_refresh.checked,
+        notifications: form.notifications.checked
+      };
+      const resp = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig)
+      });
+      const result = await resp.json();
+      document.getElementById('settingsMsg').textContent = result.success ? 'Settings saved!' : 'Failed to save settings.';
+    };
   } catch (e) {
     settingsPanel.innerHTML = '<p>Failed to load settings.</p>';
   }

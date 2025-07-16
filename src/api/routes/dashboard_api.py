@@ -4,6 +4,7 @@ import asyncio
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import logging
+from sqlalchemy import text
 
 from src.database import get_db
 from src.models.monitored_source import MonitoredSource
@@ -281,21 +282,47 @@ async def get_health():
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
-@router.get("/config")
-async def get_config():
-    """Get configuration."""
-    return {"config": {
-        "alert_threshold": 5,
-        "theme": "dark",
-        "auto_refresh": True,
-        "notifications": True
-    }}
+CONFIG_TABLE = "bot_config"
+CONFIG_DEFAULTS = {
+    "alert_threshold": 5,
+    "theme": "dark",
+    "auto_refresh": True,
+    "notifications": True
+}
 
-@router.post("/config")
-async def set_config(config: dict):
+def get_config_from_db(db):
+    try:
+        row = db.execute(text(f"SELECT * FROM {CONFIG_TABLE} LIMIT 1")).fetchone()
+        if row:
+            return dict(row)
+        else:
+            return CONFIG_DEFAULTS.copy()
+    except Exception:
+        return CONFIG_DEFAULTS.copy()
+
+def set_config_in_db(db, config: dict):
+    # Upsert config (single row)
+    keys = list(CONFIG_DEFAULTS.keys())
+    values = [config.get(k, CONFIG_DEFAULTS[k]) for k in keys]
+    placeholders = ", ".join([f":{k}" for k in keys])
+    update_clause = ", ".join([f"{k} = :{k}" for k in keys])
+    # Try update first
+    result = db.execute(text(f"UPDATE {CONFIG_TABLE} SET {update_clause}"), dict(zip(keys, values)))
+    if result.rowcount == 0:
+        # Insert if no row exists
+        db.execute(text(f"INSERT INTO {CONFIG_TABLE} ({', '.join(keys)}) VALUES ({placeholders})"), dict(zip(keys, values)))
+    db.commit()
+
+@router.get("/config")
+async def get_config(db: Session = Depends(get_db)):
+    """Get configuration."""
+    return {"config": get_config_from_db(db)}
+
+@router.put("/config")
+async def set_config(config: dict, db: Session = Depends(get_db)):
     """Set configuration."""
-    # In a real app, save to database
-    return {"success": True, "config": config}
+    set_config_in_db(db, config)
+    return {"success": True, "config": get_config_from_db(db)}
 
 # --- WebSocket for Real-Time Updates ---
 
