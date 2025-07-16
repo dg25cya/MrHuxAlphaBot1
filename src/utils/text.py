@@ -50,7 +50,7 @@ class TextFormatter:
             str: The formatted message
         """
         if emojis:
-            return emoji.emojize(message, use_aliases=True)
+            return emoji.emojize(message)
         return message
         
     @staticmethod

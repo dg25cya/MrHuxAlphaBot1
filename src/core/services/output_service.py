@@ -117,8 +117,6 @@ class OutputService:
         self, 
         channel: OutputChannel,
         content: Union[str, Dict[str, Any]],
-        source_name: str,
-        source_type: str,
         attachments: Optional[List[str]] = None,
         sentiment: Optional[float] = None,
         summary: Optional[str] = None
@@ -127,41 +125,35 @@ class OutputService:
         try:
             # Format message with metadata
             formatted_msg = self.text_formatter.format_message(
-                message=content if isinstance(content, str) else str(content),
-                extra_context={
-                    "source_name": source_name,
-                    "source_type": source_type,
-                    "sentiment": sentiment,
-                    "summary": summary
-                }
+                message=content if isinstance(content, str) else str(content)
             )
             
             success = False
             
             if str(channel.type) == str(OutputType.TELEGRAM):
                 success = await self._send_telegram(
-                    channel_id=channel.channel_id,
+                    channel_id=str(channel.identifier),
                     message=formatted_msg,
                     attachments=attachments or []
                 )
-                
+            
             elif str(channel.type) == str(OutputType.DISCORD):
                 success = await self._send_discord(
                     webhook_url=channel.webhook_url,
                     message=formatted_msg,
                     attachments=attachments or []
                 )
-                
+            
             # Update channel stats in separate context
             with db_session() as db:
                 db_channel = db.query(OutputChannel).get(channel.id)
                 if db_channel:
                     self._update_channel_stats(db, db_channel, success)
-                
+            
             return success
             
         except Exception as e:
-            logger.exception(f"Error sending message to {channel.type} channel {channel.channel_id}: {e}")
+            logger.exception(f"Error sending message to {channel.type} channel {getattr(channel, 'identifier', 'unknown')}: {e}")
             raise OutputServiceError(f"Message sending failed: {str(e)}")
     
     async def _send_telegram(

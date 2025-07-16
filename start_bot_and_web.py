@@ -17,6 +17,9 @@ from src.core.telegram.commands import setup_command_handlers
 from src.core.telegram.listener import setup_message_handler
 from src.database import SessionLocal, init_db
 from loguru import logger
+from src.core.services.source_handlers import SourceManager
+from src.core.services.output_service import OutputService
+from src.core.services.continuous_hunter import get_play_hunter
 
 settings = get_settings()
 
@@ -33,6 +36,16 @@ async def run_telegram_bot():
         logger.info("✅ Command handlers initialized")
         await setup_message_handler(client, db)
         logger.info("✅ Message listener initialized")
+
+        # --- AUTO-START HUNTING AND OUTPUT SERVICE ---
+        source_manager = SourceManager()
+        output_service = OutputService(db, client)
+        await output_service.start()
+        hunter = get_play_hunter(source_manager, output_service)
+        await hunter.start()
+        logger.info("✅ Continuous hunting started (auto)")
+        # ------------------------------------------------
+
         logger.info("🤖 Telegram bot successfully started and ready!")
         if settings.bot_token:
             logger.info(f"📊 Bot Token: {settings.bot_token[:10]}...")

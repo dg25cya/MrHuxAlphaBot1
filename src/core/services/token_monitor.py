@@ -44,9 +44,6 @@ except ImportError:
 # Import metrics from central registry
 from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry
 
-# Create a registry for our metrics
-registry = CollectorRegistry()
-
 from src.utils.metrics_registry import metrics
 
 # Public API - use centralized metrics

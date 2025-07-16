@@ -108,6 +108,24 @@ class SourceManager:
             self._update_source_error(source, str(e))
             return []
 
+    async def scan_all_sources(self, telegram_client=None, output_service=None):
+        """Scan all active sources and send detected plays to output service."""
+        from src.models.monitored_source import MonitoredSource
+        from src.utils.db import db_session
+        plays_found = []
+        with db_session() as db:
+            sources = db.query(MonitoredSource).filter(MonitoredSource.is_active == True).all()
+            for source in sources:
+                try:
+                    results = await self.scan_source(source, telegram_client)
+                    for play in results:
+                        plays_found.append(play)
+                        if output_service:
+                            await output_service.send_alert(play)
+                except Exception as e:
+                    logger.error(f"Error scanning source {source.id}: {e}")
+        return plays_found
+
     async def _scan_telegram(
         self,
         source: MonitoredSource,

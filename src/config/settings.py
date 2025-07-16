@@ -141,5 +141,12 @@ def get_settings() -> Settings:
         raise
 
 
-# Global settings instance
-settings = get_settings()
+# Global settings instance - lazy loading to avoid circular imports
+_settings_instance = None
+
+def get_settings_instance() -> Settings:
+    """Get the global settings instance."""
+    global _settings_instance
+    if _settings_instance is None:
+        _settings_instance = get_settings()
+    return _settings_instance
