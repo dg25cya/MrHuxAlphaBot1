@@ -78,6 +78,17 @@ async function loadSources() {
     const el = document.createElement('div');
     el.className = 'source-item';
     el.textContent = src.name;
+    // Add Remove button
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = 'Remove';
+    removeBtn.className = 'remove-source-btn';
+    removeBtn.onclick = async () => {
+      if (confirm(`Remove source: ${src.name}?`)) {
+        await fetch(`/api/sources/${src.id}`, { method: 'DELETE' });
+        loadSources();
+      }
+    };
+    el.appendChild(removeBtn);
     if (src.type === 'telegram') telegramSources.appendChild(el);
     if (src.type === 'discord') discordSources.appendChild(el);
     if (src.type === 'x') xSources.appendChild(el);
@@ -182,6 +193,9 @@ async function loadSettings() {
       });
       const result = await resp.json();
       document.getElementById('settingsMsg').textContent = result.success ? 'Settings saved!' : 'Failed to save settings.';
+      if (result.success) {
+        setTimeout(loadSettings, 500); // Reload settings after save
+      }
     };
   } catch (e) {
     settingsPanel.innerHTML = '<p>Failed to load settings.</p>';

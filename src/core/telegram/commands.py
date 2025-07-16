@@ -247,31 +247,43 @@ async def setup_command_handlers(client: TelegramClient, db=None):
             if action == 'add_telegram_source':
                 # Handle Telegram source addition
                 try:
-                    # Add the Telegram source
+                    # Try to resolve both chat_id and @username if possible
+                    identifier = text
+                    name = f"Telegram: {text}"
+                    # If the text is an @username, try to resolve to chat_id
+                    if text.startswith('@'):
+                        # Try to get chat_id using Telegram API
+                        try:
+                            entity = await client.get_entity(text)
+                            # get_entity may return a list, use first if so
+                            if isinstance(entity, list):
+                                entity = entity[0]
+                            if hasattr(entity, 'id'):
+                                identifier = str(entity.id)
+                                name = f"Telegram: {text} ({identifier})"
+                        except Exception as e:
+                            logger.warning(f"Could not resolve chat_id for {text}: {e}")
                     source_data = {
                         'type': SourceType.TELEGRAM,
-                        'identifier': text,
-                        'name': f"Telegram: {text}",
+                        'identifier': identifier,
+                        'name': name,
                         'is_active': True
                     }
-                    
                     with db_session() as db:
                         source = MonitoredSource(**source_data)
                         db.add(source)
                         db.commit()
-                    
                     # Clear user state
                     del user_states[user_id]
-                    
                     keyboard = [
                         [Button.inline("✅ Source Added!", "menu_sources")],
                         [Button.inline("➕ Add Another", "source_add")],
                         [Button.inline("🔙 Main Menu", "menu_main")]
                     ]
-                    
                     await safe_edit_event_message(event,
                         f"✅ **Telegram Source Added Successfully!**\n\n"
                         f"📱 **Source:** {text}\n"
+                        f"🆔 **Identifier:** {identifier}\n"
                         f"🎯 **Status:** Active and monitoring\n"
                         f"⚡ **Next:** Start receiving alerts!",
                         buttons=keyboard

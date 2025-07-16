@@ -267,7 +267,15 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
             from src.models.monitored_source import MonitoredSource
             from src.utils.db import db_session
             with db_session() as db:
-                source = db.query(MonitoredSource).filter(MonitoredSource.identifier == str(msg.chat_id), MonitoredSource.is_active == True).first()
+                # Try to match by numeric chat_id (as string) or by @username (case-insensitive)
+                chat_id_str = str(msg.chat_id)
+                username = None
+                if hasattr(msg, 'chat') and hasattr(msg.chat, 'username') and msg.chat.username:
+                    username = '@' + msg.chat.username.lower()
+                source = db.query(MonitoredSource).filter(
+                    (MonitoredSource.identifier == chat_id_str) |
+                    ((MonitoredSource.identifier.ilike(username)) if username else False)
+                ).filter(MonitoredSource.is_active == True).first()
                 if source and source.custom_filters:
                     filters = source.custom_filters.get("keywords", [])
                     if filters:
