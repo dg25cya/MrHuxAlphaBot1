@@ -7,6 +7,7 @@ import asyncio
 import uvicorn
 import sys
 from pathlib import Path
+import os
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -62,7 +63,8 @@ async def run_web_server():
     try:
         logger.info("🌐 Starting web server...")
         from src.main import app
-        config = uvicorn.Config(app, host=settings.host, port=settings.port, log_level="info")
+        port = int(os.environ.get("PORT", settings.port))
+        config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
         server = uvicorn.Server(config)
         await server.serve()
     except Exception as e:
