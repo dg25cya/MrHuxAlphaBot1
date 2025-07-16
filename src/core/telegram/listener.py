@@ -3,6 +3,7 @@ from typing import Optional, List, Dict, Any, Callable
 from functools import wraps
 import asyncio
 import re
+from datetime import datetime, timedelta
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -342,19 +343,46 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
         logger.exception(f"Error processing message: {e}")
         log_message_processed("processing_error")
 
+async def scan_last_30min_messages(client: TelegramClient, db: Session):
+    """Scan last 30 minutes of messages for all monitored Telegram sources."""
+    from src.models.monitored_source import MonitoredSource
+    logger.info("Scanning last 30 minutes of messages for all monitored Telegram sources...")
+    sources = db.query(MonitoredSource).filter(MonitoredSource.type == 'telegram', MonitoredSource.is_active == True).all()
+    for source in sources:
+        try:
+            chat_id = source.identifier
+            logger.info(f"Scanning group/channel: {source.name} ({chat_id})")
+            # Fetch last 30 minutes of messages
+            async for msg in client.iter_messages(chat_id, offset_date=datetime.utcnow() - timedelta(minutes=30)):
+                # Simulate a NewMessage.Event for each message
+                class DummyEvent:
+                    pass
+                event = DummyEvent()
+                event.message = msg
+                event.chat_id = msg.chat_id
+                await handle_new_message(event, session=db)
+        except Exception as e:
+            logger.error(f"Failed to scan messages for {source.name} ({source.identifier}): {e}")
+    logger.info("Finished scanning last 30 minutes of messages.")
+
+# Patch setup_message_handler to call scan_last_30min_messages on startup
 async def setup_message_handler(client: TelegramClient, db=None, text_analyzer=None):
     """Setup message handler for the bot."""
     # Start the batch processor
     asyncio.create_task(message_batch.start_background_processor())
-    
+
     async def batch_message_handler(event: NewMessage.Event):
-        """Handler that adds messages to batch processor."""
+        logger.info(f"Received message in chat {getattr(event, 'chat_id', None)}")
         await message_batch.add_message(event)
-    
+
     # Register handler for new messages
     client.add_event_handler(
         batch_message_handler,
         events.NewMessage(func=lambda e: True)  # Handle all new messages
     )
-    
+
+    # Scan last 30 minutes of messages on startup
+    if db is None:
+        db = SessionLocal()
+    await scan_last_30min_messages(client, db)
     logger.info("Message handler and batch processor setup complete")
