@@ -64,6 +64,7 @@ async def run_web_server():
         logger.info("🌐 Starting web server...")
         from src.main import app
         port = int(os.environ.get("PORT", settings.port))
+        logger.info(f"🌐 Web Server: http://0.0.0.0:{port}")
         config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
         server = uvicorn.Server(config)
         await server.serve()
