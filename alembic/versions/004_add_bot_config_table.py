@@ -7,6 +7,12 @@ Create Date: 2024-07-16
 from alembic import op
 import sqlalchemy as sa
 
+# revision identifiers, used by Alembic.
+revision = '004_add_bot_config_table'
+down_revision = '003'
+branch_labels = None
+depends_on = None
+
 def upgrade():
     op.create_table(
         'bot_config',

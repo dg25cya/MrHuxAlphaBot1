@@ -309,7 +309,8 @@ def set_config_in_db(db, config: dict):
     # Try update first
     result = db.execute(text(f"UPDATE {CONFIG_TABLE} SET {update_clause}"), dict(zip(keys, values)))
     if result.rowcount == 0:
-        # Insert if no row exists
+        # Delete all rows to guarantee only one config row
+        db.execute(text(f"DELETE FROM {CONFIG_TABLE}"))
         db.execute(text(f"INSERT INTO {CONFIG_TABLE} ({', '.join(keys)}) VALUES ({placeholders})"), dict(zip(keys, values)))
     db.commit()
 
