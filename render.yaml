@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: mr-hux-alpha-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python start_bot_and_web.py
+    envVars:
+      - key: ENV
+        value: production
+      - key: DEBUG
+        value: false
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 8000
+      - key: LOG_LEVEL
+        value: INFO
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: OUTPUT_CHANNEL_ID
+        sync: false
+      - key: ADMIN_USER_IDS
+        sync: false
+      - key: RUGCHECK_API_KEY
+        sync: false
+      - key: BIRDEYE_API_KEY
+        sync: false
+      - key: PUMPFUN_API_KEY
+        sync: false
+      - key: BONKFUN_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: MONITORING_INTERVAL
+        value: 30
+      - key: ALERT_COOLDOWN
+        value: 60
+      - key: MAX_DAILY_ALERTS
+        value: 1000
+      - key: ENABLE_REALTIME
+        value: true
+      - key: WEBSOCKET_ENABLED
+        value: true
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRATION_HOURS
+        value: 24 
