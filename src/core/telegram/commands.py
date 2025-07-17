@@ -16,6 +16,8 @@ from src.core.services.output_service import OutputService
 from src.core.services.text_analysis import TextAnalysisService
 from src.utils.db import db_session
 from src.core.telegram.listener import get_sources_summary
+from src.core.services.token_monitor import TokenMonitor
+from src.core.services.continuous_hunter import ContinuousPlayHunter
 
 settings = get_settings()
 
@@ -1862,3 +1864,38 @@ async def setup_command_handlers(client: TelegramClient, db=None):
         summary = await get_sources_summary(db)
         await event.reply(f"<b>Monitored Sources:</b>\n{summary}", parse_mode='html')
         db.close()
+
+    @client.on(events.NewMessage(pattern='/scanners'))
+    async def scanners_command(event: Message):
+        """Reply with the status of all background scanners."""
+        token_monitor = TokenMonitor()
+        status = await token_monitor.get_system_status()
+        text = (
+            f"<b>Background Scanners Status</b>\n"
+            f"Pump.fun: {status['api_status'].get('pumpfun', 'unknown')}\n"
+            f"Dexscreener: {status['api_status'].get('dexscreener', 'unknown')}\n"
+            f"Birdeye: {status['api_status'].get('birdeye', 'unknown')}\n"
+            f"Bonkfun: {status['api_status'].get('bonkfun', 'unknown')}\n"
+            f"Rugcheck: {status['api_status'].get('rugcheck', 'unknown')}\n"
+            f"Telegram: running\n"
+            f"Uptime: {status.get('uptime_hours', 0):.2f} hours\n"
+            f"Messages Processed: {status.get('messages_processed', 0)}\n"
+            f"Errors (last hour): {status.get('errors_last_hour', 0)}\n"
+        )
+        await event.reply(text, parse_mode='html')
+
+    @client.on(events.NewMessage(pattern='/status'))
+    async def status_command(event: Message):
+        """Reply with overall bot health and stats."""
+        token_monitor = TokenMonitor()
+        status = await token_monitor.get_system_status()
+        text = (
+            f"<b>MR HUX Alpha Bot Status</b>\n"
+            f"Running: {status.get('is_running', False)}\n"
+            f"Uptime: {status.get('uptime_hours', 0):.2f} hours\n"
+            f"Messages Processed: {status.get('messages_processed', 0)}\n"
+            f"Errors (last hour): {status.get('errors_last_hour', 0)}\n"
+            f"API Health: {status.get('api_status', {})}\n"
+            f"Memory Usage: {status.get('memory_usage_mb', 0):.2f} MB\n"
+        )
+        await event.reply(text, parse_mode='html')

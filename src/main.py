@@ -14,6 +14,10 @@ from src.core.telegram.commands import setup_command_handlers
 from src.core.telegram.listener import setup_message_handler
 from src.database import SessionLocal, init_db
 from src.api.routes import health_router, dashboard, metrics, websocket, dashboard_api_router
+from src.core.services.continuous_hunter import ContinuousPlayHunter
+from src.core.services.token_monitor import TokenMonitor
+from src.core.services.source_handlers import SourceManager
+from src.core.services.output_service import OutputService
 
 settings = get_settings()
 
@@ -135,6 +139,15 @@ async def main():
         # Setup message listener for monitoring groups
         await setup_message_handler(client, db)
         logger.info("✅ Message listener initialized")
+        
+        # --- Start background scanners ---
+        source_manager = SourceManager(db)
+        output_service = OutputService(db, client)
+        play_hunter = ContinuousPlayHunter(source_manager, output_service)
+        token_monitor = TokenMonitor()
+        asyncio.create_task(play_hunter.start())
+        asyncio.create_task(token_monitor.start())
+        logger.info("✅ ContinuousPlayHunter and TokenMonitor started")
         
         # Log successful startup
         logger.info("🤖 Bot successfully started and ready!")

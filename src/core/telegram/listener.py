@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timedelta
 import os
 import json
+import types
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -228,7 +229,7 @@ async def send_token_alert(token: Token, message_text: str, group: MonitoredGrou
                     from src.core.telegram.client import client
                     if client and client.is_connected():
                         await client.send_message(
-                            entity=channel.identifier,
+                            entity=str(channel.identifier),
                             message=alert_message,
                             parse_mode='markdown'
                         )
@@ -238,7 +239,7 @@ async def send_token_alert(token: Token, message_text: str, group: MonitoredGrou
                     import aiohttp
                     async with aiohttp.ClientSession() as session:
                         await session.post(
-                            channel.identifier,
+                            str(channel.identifier),
                             json={"content": alert_message}
                         )
                         logger.info(f"Alert sent to Discord webhook {channel.identifier}")
@@ -278,18 +279,18 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
                 # Try to match by numeric chat_id (as string) or by @username (case-insensitive)
                 chat_id_str = str(msg.chat_id)
                 username = None
-                if hasattr(msg, 'chat') and hasattr(msg.chat, 'username') and msg.chat.username:
+                if hasattr(msg, 'chat') and hasattr(msg.chat, 'username') and getattr(msg.chat, 'username', None):
                     username = '@' + msg.chat.username.lower()
                 logger.info(f"[BOT] Checking monitored sources for chat_id={chat_id_str}, username={username}")
                 source = db.query(MonitoredSource).filter(
                     (MonitoredSource.identifier == chat_id_str) |
                     ((MonitoredSource.identifier.ilike(username)) if username else False)
-                ).filter(MonitoredSource.is_active == True).first()
+                ).filter(MonitoredSource.is_active.is_(True)).first()
                 if source:
                     logger.info(f"[BOT] Matched monitored source: {source.id} {source.identifier} {source.name}")
                 else:
                     logger.warning(f"[BOT] No monitored source matched for chat_id={chat_id_str}, username={username}")
-                if source and source.custom_filters:
+                if source and getattr(source, 'custom_filters', None):
                     filters = source.custom_filters.get("keywords", [])
                     if filters:
                         matched = False
@@ -356,18 +357,19 @@ async def handle_new_message(event: NewMessage.Event, session: Optional[Session]
 
 async def scan_last_30min_messages(client: TelegramClient, db: Session, sources=None):
     """Scan last 30 minutes of messages for all or specific monitored Telegram sources."""
+    if settings.bot_token:
+        logger.warning("[BOT] Telegram Bot API does not allow bots to fetch message history. Skipping retroactive scan.")
+        return
     from src.models.monitored_source import MonitoredSource
     logger.info("Scanning last 30 minutes of messages for Telegram sources...")
     if sources is None:
-        sources = db.query(MonitoredSource).filter(MonitoredSource.type == 'telegram', MonitoredSource.is_active == True).all()
+        sources = db.query(MonitoredSource).filter(MonitoredSource.type == 'telegram', MonitoredSource.is_active.is_(True)).all()
     for source in sources:
         try:
-            chat_id = source.identifier
+            chat_id = str(source.identifier)
             logger.info(f"Scanning group/channel: {source.name} ({chat_id})")
             async for msg in client.iter_messages(chat_id, offset_date=datetime.utcnow() - timedelta(minutes=30)):
-                class DummyEvent:
-                    pass
-                event = DummyEvent()
+                event = types.SimpleNamespace()
                 event.message = msg
                 event.chat_id = msg.chat_id
                 await handle_new_message(event, session=db)
@@ -376,9 +378,11 @@ async def scan_last_30min_messages(client: TelegramClient, db: Session, sources=
     logger.info("Finished scanning last 30 minutes of messages.")
 
 async def log_bot_startup(client, db):
-    logger.info(f"[BOT] Starting Telegram bot...")
+    logger.info("[BOT] Starting Telegram bot...")
     db_path = os.environ.get('DATABASE_URL') or getattr(db.bind, 'url', None)
     logger.info(f"[BOT] Using database: {db_path}")
+    if 'sqlite' in str(db_path):
+        logger.warning("[BOT] WARNING: SQLite is not recommended for concurrent use. You may see 'database is locked' errors if both the bot and webserver are running. For production, use PostgreSQL or another robust database backend.")
     from src.models.monitored_source import MonitoredSource
     sources = db.query(MonitoredSource).all()
     logger.info(f"[BOT] Loaded {len(sources)} sources from database:")
@@ -395,7 +399,7 @@ async def redis_source_sync_loop(client, db):
     try:
         redis = RedisCache()
         await redis.initialize()
-        pubsub = await redis._redis.pubsub()
+        pubsub = redis._redis.pubsub()
         await pubsub.subscribe('source_updates')
         logger.info("[BOT] Subscribed to Redis channel 'source_updates' for real-time source sync.")
         while True:
